@@ -878,7 +878,7 @@ MlasGemmQuantGetDispatch(
 {
     const MLAS_GEMM_QUANT_DISPATCH* GemmQuantDispatch = &MlasGemmQuantDispatchDefault;
 
-#if defined(MLAS_TARGET_AMD64_IX86) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64_IX86)
     if (AIsSigned) {
         GemmQuantDispatch =
             BIsSigned ? GetMlasPlatform().GemmS8S8Dispatch : GetMlasPlatform().GemmS8U8Dispatch;
@@ -908,6 +908,11 @@ MlasGemmQuantGetDispatch(
     }
 #elif defined(MLAS_TARGET_RISCV64) && defined(RISCV64_SPACEMIT_IME1) && defined(__linux__)
     GemmQuantDispatch = &MlasGemmX8X8DispatchSpacemiTIme_BASE;
+#elif defined(MLAS_TARGET_LARCH64)
+    if (!AIsSigned) {
+        GemmQuantDispatch =
+            BIsSigned ? GetMlasPlatform().GemmU8S8Dispatch : GetMlasPlatform().GemmU8U8Dispatch;
+    }
 #endif
 
     if (nullptr == GemmQuantDispatch) {
