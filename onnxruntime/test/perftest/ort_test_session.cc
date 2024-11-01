@@ -27,6 +27,8 @@
 #include "core/providers/dml/dml_session_options_config_keys.h"
 #endif
 
+#include "test/util/test_spacemit_ep.h"
+
 #ifdef _WIN32
 #define strdup _strdup
 #endif
@@ -34,6 +36,21 @@ extern const OrtApi* g_ort;
 
 namespace onnxruntime {
 namespace perftest {
+
+
+static int SetSchedAffinity(const std::vector<int>& cpu_ids) {
+ cpu_set_t cpuset;
+ CPU_ZERO(&cpuset);
+ pthread_t main_thread = pthread_self();
+ for (size_t i = 0; i < cpu_ids.size(); i++) {
+   CPU_SET(cpu_ids[i], &cpuset);
+ }
+ int s = pthread_setaffinity_np(main_thread, sizeof(cpu_set_t), &cpuset);
+ if (s != 0) {
+   fprintf(stderr, "set thread affinity error.");
+ }
+ return 0;
+}
 
 std::chrono::duration<double> OnnxRuntimeTestSession::Run() {
   // Randomly pick one OrtValueArray from test_inputs_. (NOT ThreadSafe)

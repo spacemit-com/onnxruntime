@@ -485,6 +485,275 @@ MlasTranspose8x8Block(
     __lsx_vst(__lsx_vinsgr2vr_d(__lsx_vld((__m128i *)&Output[OutputStride * 6], 0), __lsx_vpickve2gr_d(d3, 0), 0), (__m128i *)&Output[OutputStride * 6], 0);
     __lsx_vst(__lsx_vinsgr2vr_d(__lsx_vld((__m128i *)&Output[OutputStride * 7], 0), __lsx_vpickve2gr_d(d3, 1), 0), (__m128i *)&Output[OutputStride * 7], 0);
 }
+#endif
+
+#if defined(MLAS_TARGET_RISCV64)
+MLAS_FORCEINLINE
+void
+MlasTranspose8x8Block(
+    const uint8_t* Input,
+    size_t InputStride,
+    uint8_t* Output,
+    size_t OutputStride
+    )
+{
+    const uint8_t* InputArg = Input;
+    __asm__ volatile(//"li          t1,       8                   \t\n"
+                     "vsetvli     t0,       zero,     e8, mf4   \t\n"
+                     "vle8.v      v0,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v1,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v2,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v3,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v4,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v5,       (%[x])              \t\n"
+                     "vssseg4e8.v   v0,   (%[y]),    %[os]     \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "addi        t1,       %[y], 4             \t\n"
+                     "vle8.v      v6,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v7,       (%[x])              \t\n"
+                     //"vssseg8e8.v v0,    (%[y]),   %[os]     \t\n"
+                     "vssseg4e8.v   v4,   (t1),    %[os]    \t\n"
+
+
+                     : [x] "+r"(InputArg)
+                     : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output)
+                     : "cc", "t0", "t1");
+}
+
+MLAS_FORCEINLINE
+void
+MlasTranspose16x16Block(
+    const uint8_t* Input,
+    size_t InputStride,
+    uint8_t* Output,
+    size_t OutputStride
+    )
+{
+    const uint8_t* InputArg = Input;
+    __asm__ volatile(//"li          t1,       8                   \t\n"
+                     "vsetvli     t0,       zero,     e8, mf2   \t\n"
+                     "vle8.v      v0,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v1,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v2,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v3,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v4,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v5,       (%[x])              \t\n"
+                     "vssseg4e8.v   v0,   (%[y]),    %[os]     \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "addi        t1,       %[y], 4             \t\n"
+                     "vle8.v      v6,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v7,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+
+                     "vle8.v      v8,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v9,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v10,       (%[x])              \t\n"
+                     "vssseg4e8.v   v4,   (t1),    %[os]        \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v11,       (%[x])              \t\n"
+                     "addi        t1,       t1, 4               \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v12,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v13,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vssseg4e8.v   v8,   (t1),    %[os]        \t\n"
+                     "addi        t1,       t1, 4               \t\n"
+                     "vle8.v      v14,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle8.v      v15,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vssseg4e8.v   v12,   (t1),    %[os]        \t\n"
+                     //"vssseg8e8.v v0,    (%[y]),   %[os]     \t\n"
+
+
+                     : [x] "+r"(InputArg)
+                     : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output)
+                     : "cc", "t0", "t1");
+}
+
+MLAS_FORCEINLINE
+void
+MlasTranspose16x16Block(
+    const uint32_t* Input,
+    size_t InputStride,
+    uint32_t* Output,
+    size_t OutputStride
+    )
+{
+    const uint32_t* InputArg = Input;
+    InputStride = InputStride << 2;
+    OutputStride  = OutputStride   << 2;
+    __asm__ volatile(
+       "addi            s1, %[y], 16            \n\t"
+       "addi            s2, s1, 16              \n\t"
+       "addi            s3, s2, 16              \n\t"
+
+       "vsetvli         t0, zero, e32, m2       \n\t"
+       "vle32.v         v0, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v2, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v4, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v6, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vssseg4e32.v    v0, (%[y]), %[os]       \n\t"
+
+       "vle32.v         v8, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v10, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v12, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v14, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vssseg4e32.v    v8, (s1), %[os]         \n\t"
+
+       "vle32.v         v16, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v18, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v20, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v22, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vssseg4e32.v    v16, (s2), %[os]        \n\t"
+
+       "vle32.v         v24, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v26, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v28, (%[x])             \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v30, (%[x])             \n\t"
+       "vssseg4e32.v    v24, (s3), %[os]        \n\t"
+
+       : [x] "+r"(InputArg)
+       : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output)
+       : "cc", "t0", "s1", "s2", "s3");
+}
+
+MLAS_FORCEINLINE
+void
+MlasTranspose8x8Block(
+    const uint32_t* Input,
+    size_t InputStride,
+    uint32_t* Output,
+    size_t OutputStride
+    )
+{
+    const uint32_t* InputArg = Input;
+    InputStride = InputStride << 2;
+    OutputStride  = OutputStride   << 2;
+    __asm__ volatile(
+       "addi            s1, %[y], 16            \n\t"
+
+       "vsetvli         t0, zero, e32, m1       \n\t"
+       "vle32.v         v0, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v1, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v2, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v3, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vssseg4e32.v    v0, (%[y]), %[os]       \n\t"
+       "vle32.v         v4, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v5, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v6, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vle32.v         v7, (%[x])              \n\t"
+       "add             %[x], %[x], %[is]       \n\t"
+       "vssseg4e32.v    v4, (s1), %[os]         \n\t"
+
+       : [x] "+r"(InputArg)
+       : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output)
+       : "cc", "t0", "s1");
+}
+
+MLAS_FORCEINLINE
+void
+MlasTranspose4x4Block(
+    const uint32_t* Input,
+    size_t InputStride,
+    uint32_t* Output,
+    size_t OutputStride
+    )
+{
+    const uint32_t* InputArg = Input;
+    InputStride = InputStride << 2;
+    OutputStride = OutputStride << 2;
+    __asm__ volatile(
+                     "vsetvli     t0,       zero,     e32,      mf2\t\n"
+                     "vle32.v     v0,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle32.v     v1,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle32.v     v2,       (%[x])              \t\n"
+                     "add         %[x],     %[x],     %[is]     \t\n"
+                     "vle32.v     v3,       (%[x])              \t\n"
+                     "vssseg4e32.v v0,      (%[y]),   %[os]     \t\n"
+                     : [x] "+r"(InputArg)
+                     : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output)
+                     : "cc", "t0", "t1");
+}
+
+template<typename ElementType>
+MLAS_FORCEINLINE
+void
+MlasTransposeNVector(
+    const ElementType* Input,
+    size_t InputStride,
+    ElementType* Output,
+    size_t OutputStride,
+    size_t N
+    )
+{
+  constexpr size_t ElementSize = sizeof(ElementType);
+  OutputStride  = OutputStride * ElementSize;
+  if constexpr (ElementSize == 4) {
+    __asm__ volatile(
+       "vsetvli         t0, %[N], e32, m2       \n\t"
+       "vle32.v         v0, (%[x])              \n\t"
+       "vsse32.v        v0, (%[y]), %[os]       \n\t"
+       :
+       : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output), [x] "r"(Input), [N] "r"(N)
+       : "cc", "t0");
+  } else if constexpr (ElementSize == 2) {
+    __asm__ volatile(
+       "vsetvli         t0, %[N], e16, m1       \n\t"
+       "vle16.v         v0, (%[x])              \n\t"
+       "vsse16.v        v0, (%[y]), %[os]       \n\t"
+       :
+       : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output), [x] "r"(Input), [N] "r"(N)
+       : "cc", "t0");
+  } else if constexpr (ElementSize  == 1) {
+    __asm__ volatile(
+       "vsetvli         t0, %[N], e8, mf2       \n\t"
+       "vle8.v          v0, (%[x])              \n\t"
+       "vsse8.v         v0, (%[y]), %[os]       \n\t"
+       :
+       : [is] "r"(InputStride), [os] "r"(OutputStride), [y] "r"(Output), [x] "r"(Input), [N] "r"(N)
+       : "cc", "t0");
+  }
+}
 
 #endif
 
@@ -509,7 +778,7 @@ MlasTranspose4xNVector(
     Output[OutputStride * 3] = a3;
 }
 
-#if defined(MLAS_TARGET_POWER)
+#if defined(MLAS_TARGET_POWER) || defined(MLAS_TARGET_RISCV64)
 template<typename ElementType>
 MLAS_FORCEINLINE
 void
@@ -581,6 +850,54 @@ Return Value:
     // at a time.
     //
 
+#if defined(MLAS_TARGET_RISCV64)
+    while (n >= 16) {
+      const uint32_t* s = Input;
+      uint32_t* d= Output;
+      size_t m = M;
+
+      while (m >= 16){
+        MlasTranspose16x16Block(s, N, d, M);
+        s += N * 16;
+        d += 16;
+        m -= 16;
+      }
+      while (m > 0) {
+        MlasTransposeNVector(s, 1, d, M, 16);
+        s += N;
+        d += 1;
+        m -= 1;
+      }
+      Input += 16;
+      Output += M * 16;
+      n -= 16;
+
+    }
+
+    while (n >= 8) {
+      const uint32_t* s = Input;
+      uint32_t* d= Output;
+      size_t m = M;
+
+      while (m >= 8){
+        MlasTranspose8x8Block(s, N, d, M);
+        s += N * 8;
+        d += 8;
+        m -= 8;
+      }
+      while (m > 0) {
+        MlasTransposeNVector(s, 1, d, M, 8);
+        s += N;
+        d += 1;
+        m -= 1;
+      }
+      Input += 8;
+      Output += M * 8;
+      n -= 8;
+
+    }
+#endif
+
     while (n >= 4) {
 
         const uint32_t* s = Input;
@@ -588,7 +905,7 @@ Return Value:
         size_t m = M;
 
 #if defined(MLAS_SSE2_INTRINSICS) || defined(MLAS_NEON_INTRINSICS) || defined(MLAS_TARGET_POWER) || \
-    defined(MLAS_LSX_INTRINSICS)
+    defined(MLAS_LSX_INTRINSICS) || defined(MLAS_TARGET_RISCV64)
 
         while (m >= 4) {
 
@@ -602,9 +919,11 @@ Return Value:
 #endif
 
         while (m > 0) {
-
+#if defined(MLAS_TARGET_RISCV64)
+            MlasTransposeNVector(s, 1, d, M, 4);
+#else
             MlasTranspose4xNVector(s, 1, d, M);
-
+#endif
             s += N;
             d += 1;
             m -= 1;
@@ -815,7 +1134,7 @@ Return Value:
     // Transpose elements from the input matrix to the output matrix 8 columns
     // at a time.
     //
-#if defined(MLAS_TARGET_POWER)
+#if defined(MLAS_TARGET_POWER) ||defined(MLAS_TARGET_RISCV64)
     while (n >= 16) {
 
         const uint8_t* s = Input;

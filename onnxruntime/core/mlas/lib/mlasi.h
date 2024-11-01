@@ -75,6 +75,9 @@ Abstract:
 #if defined(MLAS_TARGET_WASM_SIMD)
 #include <wasm_simd128.h>
 #endif
+#if defined(__riscv) && defined(__riscv_v)
+#include <riscv_vector.h>
+#endif
 #endif
 
 //
@@ -302,7 +305,7 @@ static_assert(sizeof(MLAS_FP16) == FP16_SIZE);
 //
 
 #define MLAS_SGEMM_STRIDEN                          128
-#define MLAS_SGEMM_STRIDEK                          128
+#define MLAS_SGEMM_STRIDEK                          256
 #define MLAS_SGEMM_PACKED_STRIDEN                   128
 #define MLAS_SGEMM_PACKED_STRIDEK                   256
 #define MLAS_DGEMM_STRIDEN                          64
@@ -897,6 +900,21 @@ extern "C" {
     MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32KernelNeon;
     MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16KernelNeon;
 #endif
+
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasComputeExpF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasErfKernel_RVV;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL MlasReduceMaximumF32Kernel_RVV;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL MlasComputeSumExpF32Kernel_RVV;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeLogSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasTanhKernel_RVV;
+    MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32Kernel_RVV;
+    MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasLogisticKernel_RVV;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL MlasReduceMinimumMaximumF32Kernel_RVV;
+#endif
+
 }
 
 //
@@ -974,6 +992,7 @@ extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmS8S8DispatchSmmla;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmU8X8DispatchWasmSimd;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmQuantDispatchDefault;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchPOWER10;
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmX8X8DispatchSpacemiTIme_BASE;
 
 //
 // Symmetric quantized qgemm dispatch structure
@@ -1028,6 +1047,8 @@ extern const MLAS_SQNBIT_GEMM_DISPATCH MlasSQNBitGemmDispatchAvx2vnni;
 extern const MLAS_SQNBIT_GEMM_DISPATCH MlasSQNBitGemmDispatchAvx512;
 
 extern const MLAS_SQNBIT_GEMM_DISPATCH MlasSQNBitGemmDispatchAvx512vnni;
+
+extern const MLAS_SQNBIT_GEMM_DISPATCH MlasSQNBitGemmDispatchSpacemiTIme;
 
 //
 // Quantized depthwise convolution kernels.
@@ -1091,6 +1112,18 @@ struct MLAS_PLATFORM {
 
     MLAS_PLATFORM(void);
 
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ComputeExpF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ErfKernelRoutine;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL* ReduceMaximumF32Kernel;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL* ComputeSumExpF32Kernel;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeLogSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * TanhKernelRoutine;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * LogisticKernelRoutine;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL* ReduceMinimumMaximumF32Kernel;
+    MLAS_GEMM_FLOAT_KERNEL * GemmFloatKernel;
+#endif
 #if defined(MLAS_TARGET_AMD64_IX86) || defined(MLAS_TARGET_POWER)
     MLAS_GEMM_FLOAT_KERNEL* GemmFloatKernel;
 #endif
@@ -1399,6 +1432,8 @@ MlasConvDepthwiseFloat_CHW(
 #define MLAS_WASM_SIMD_INTRINSICS
 #elif defined(MLAS_TARGET_LARCH64)
 #define MLAS_LSX_INTRINSICS
+#elif defined(MLAS_TARGET_RISCV64) && defined(MLAS_RVV10_SUPPORTED) && defined(__riscv_v_intrinsic)
+#define MLAS_RVV10_INTRINSICS
 #endif
 
 #if defined(MLAS_NEON_INTRINSICS)

@@ -141,14 +141,55 @@ Return Value:
     const float* Bias = Bias_;
     const float* Scale = Scale_;
 
-    if (HasBias) {
+    if constexpr (HasBias) {
         Bias += StartN;
     }
 
-    if(QuantGran == MLAS_QUANTIZATION_GRANULARITY::PerColumn){
+    if constexpr (QuantGran == MLAS_QUANTIZATION_GRANULARITY::PerColumn){
         Scale += StartN;
     }
 
+#if defined(MLAS_TARGET_RISCV64)
+    C += StartM * ldc + StartN;
+    Output += StartM * LeadingDimensionOutput_ + StartN;
+    float ScaleValue = Scale_[0];
+    while (CountM-- > 0) {
+
+        float* c_out = Output;
+        const int32_t* c = C;
+        const float* bias = Bias;
+        const float* scale = Scale;
+
+        size_t n = CountN;
+
+        for (size_t vl; n > 0; n -= vl, c += vl, c_out += vl) {
+            vl = __riscv_vsetvl_e32m4(n);
+            vfloat32m4_t ScaleVector = __riscv_vfmv_v_f_f32m4(ScaleValue, vl);
+            vfloat32m4_t FloatVector = __riscv_vfcvt_f_x_v_f32m4(__riscv_vle32_v_i32m4(c, vl), vl);
+
+            if constexpr (QuantGran == MLAS_QUANTIZATION_GRANULARITY::PerColumn) {
+                ScaleVector = __riscv_vle32_v_f32m4(scale, vl);
+                scale += vl;
+            }
+
+            if constexpr (Mode == MLAS_QGEMM_OUTPUT_MODE::AccumulateMode) {
+                FloatVector = __riscv_vfmacc_vv_f32m4(__riscv_vle32_v_f32m4(c_out, vl), FloatVector, ScaleVector, vl);
+            } else {
+                FloatVector = __riscv_vfmul_vv_f32m4(FloatVector, ScaleVector, vl);
+            }
+
+            if constexpr (HasBias) {
+                FloatVector = __riscv_vfadd_vv_f32m4(FloatVector, __riscv_vle32_v_f32m4(bias, vl), vl);
+                bias += vl;
+            }
+
+            __riscv_vse32_v_f32m4(c_out, FloatVector, vl);
+        }
+
+        C += ldc;
+        Output += LeadingDimensionOutput_;
+    }
+#else
     MLAS_FLOAT32X4 ScaleVector = MlasBroadcastFloat32x4(Scale_);
 #if !defined(MLAS_SSE2_INTRINSICS)
     float ScaleValue = MlasExtractLaneFloat32x4<0>(ScaleVector);
@@ -235,4 +276,5 @@ Return Value:
         C += ldc;
         Output += LeadingDimensionOutput_;
     }
+#endif
 }

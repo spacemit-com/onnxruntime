@@ -27,6 +27,7 @@
 #include "core/framework/session_options.h"
 #include "core/session/onnxruntime_session_options_config_keys.h"
 #include "nlohmann/json.hpp"
+#include "test/util/test_spacemit_ep.h"
 
 #ifdef USE_CUDA
 #include "core/providers/cuda/cuda_provider_options.h"
@@ -48,7 +49,7 @@ void usage() {
       "\t-v: verbose\n"
       "\t-n [test_case_name]: Specifies a single test case to run.\n"
       "\t-e [EXECUTION_PROVIDER]: EXECUTION_PROVIDER could be 'cpu', 'cuda', 'dnnl', 'tensorrt', 'vsinpu'"
-      "'openvino', 'rocm', 'migraphx', 'acl', 'armnn', 'xnnpack', 'webgpu', 'nnapi', 'qnn', 'snpe' or 'coreml'. "
+      "'openvino', 'rocm', 'migraphx', 'acl', 'armnn', 'xnnpack', 'webgpu', 'nnapi', 'qnn', 'snpe', 'coreml' or 'spacemit'. "
       "Default: 'cpu'.\n"
       "\t-p: Pause after launch, can attach debugger and continue\n"
       "\t-x: Use parallel executor, default (without -x): sequential executor.\n"
@@ -203,6 +204,7 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   ExecutionMode execution_mode = ExecutionMode::ORT_SEQUENTIAL;
   int repeat_count = 1;
   int p_models = GetNumCpuCores();
+  bool enable_spacemit = false;
   bool enable_cuda = false;
   bool enable_dnnl = false;
   bool enable_openvino = false;
@@ -280,6 +282,8 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
           provider_name = ToUTF8String(optarg);
           if (!CompareCString(optarg, ORT_TSTR("cpu"))) {
             // do nothing
+          } else if (!CompareCString(optarg, ORT_TSTR("spacemit"))) {
+            enable_spacemit = true;
           } else if (!CompareCString(optarg, ORT_TSTR("cuda"))) {
             enable_cuda = true;
           } else if (!CompareCString(optarg, ORT_TSTR("dnnl"))) {
@@ -456,6 +460,14 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
       sf.AddConfigEntry(kOrtSessionOptionEpContextEnable, "1");
     if (disable_ep_context_embed_mode)
       sf.AddConfigEntry(kOrtSessionOptionEpContextEmbedMode, "0");
+
+    if (enable_spacemit) {
+      auto sts = onnxruntime::test::InitSpaceMITExecutionProvider(sf);
+      if (sts != nullptr) {
+        fprintf(stderr, "InitSpaceMITExecutionProvider Error\n");
+        return -1;
+      }
+    }
 
     for (auto& it : session_config_entries) {
       sf.AddConfigEntry(it.first.c_str(), it.second.c_str());

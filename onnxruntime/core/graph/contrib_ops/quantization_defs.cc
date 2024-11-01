@@ -57,19 +57,19 @@ void ValidateTypeAndShapeForScaleAndZP(ONNX_NAMESPACE::InferenceContext& ctx, in
     ONNX_NAMESPACE::TensorShapeProto shape = ctx.getInputType(index)->tensor_type().shape();
     if (expectedScalar == QuantParamTensorType::Scalar) {
       if (shape.dim_size() != 0) {
-        fail_type_inference("Scale and Zero-point must be a scalar");
+        fail_type_inference("input arg index ", index, " Scale and Zero-point must be a scalar");
       }
     } else {
       if (expectedScalar == QuantParamTensorType::Both && shape.dim_size() == 0) {
         return;
       }
       if (shape.dim_size() != 1) {
-        fail_type_inference("Scale and Zero-point must be of rank 1");
+        fail_type_inference("input arg index ", index, " Scale and Zero-point must be of rank 1");
       }
 
       if (shape.dim((int)0).has_dim_value() && shape.dim((int)0).dim_value() != expectedTensorSize) {
         fail_type_inference(
-            "Scale and Zero-point must be of rank 1 and the number of elements should be equal to the number of rows "
+            "input arg index ", index, " Scale and Zero-point must be of rank 1 and the number of elements should be equal to the number of rows "
             "of the corresponding input.");
       }
     }
@@ -914,6 +914,7 @@ ONNX_MS_OPERATOR_SET_SCHEMA(
         .Attr("transA", "Whether A should be transposed", AttributeProto::INT, static_cast<int64_t>(0))
         .Attr("transB", "Whether B should be transposed", AttributeProto::INT, static_cast<int64_t>(0))
         .Attr("alpha", "Scalar multiplier for the product of input tensors A * B.", AttributeProto::FLOAT, 1.0f)
+        .Attr("beta", "Scalar multiplier for the product of input tensors A * B.", AttributeProto::FLOAT, 1.0f)
         .TypeConstraint("T", {"tensor(float)"}, "Constrain scale types to float tensors.")
         .TypeConstraint("TA", {"tensor(uint8)", "tensor(int8)"},
                         "Constrain input A and its zero point types to 8 bit tensors.")
@@ -1510,12 +1511,23 @@ output_shape can also be explicitly specified in which case pads values are auto
             fail_type_inference("inputs are expected to have tensor type.");
           }
 
+          const ONNX_NAMESPACE::TensorShapeProto i_shape = ctx.getInputType(0)->tensor_type().shape();
+          const ONNX_NAMESPACE::TensorShapeProto w_shape = ctx.getInputType(3)->tensor_type().shape();
+          const ONNX_NAMESPACE::AttributeProto* group_attr = ctx.getAttribute("group");
+          int o_c = 1;
+          int group = 1;
+          if (group_attr != nullptr) {
+            group = group_attr->i();
+          }
+          if (w_shape.dim_size() > 1 && w_shape.dim((int)1).has_dim_value()) {
+            o_c = w_shape.dim((int)1).dim_value() * group;
+          }
           // validate scale and zero points
           // scale and zero points could be scalar or 1-D tensor which depends on quanization per-channel or per-tensor
           ValidateTypeAndShapeForScaleAndZP(ctx, 1, ONNX_NAMESPACE::TensorProto::FLOAT, QuantParamTensorType::Scalar);
           ValidateTypeAndShapeForScaleAndZP(ctx, 2, x_type->tensor_type().elem_type(), QuantParamTensorType::Scalar);
-          ValidateTypeAndShapeForScaleAndZP(ctx, 4, ONNX_NAMESPACE::TensorProto::FLOAT, QuantParamTensorType::Both);
-          ValidateTypeAndShapeForScaleAndZP(ctx, 5, w_type->tensor_type().elem_type(), QuantParamTensorType::Scalar);
+          ValidateTypeAndShapeForScaleAndZP(ctx, 4, ONNX_NAMESPACE::TensorProto::FLOAT, QuantParamTensorType::Both, o_c);
+          ValidateTypeAndShapeForScaleAndZP(ctx, 5, w_type->tensor_type().elem_type(), QuantParamTensorType::Both, o_c);
           ValidateTypeAndShapeForScaleAndZP(ctx, 6, ONNX_NAMESPACE::TensorProto::FLOAT, QuantParamTensorType::Scalar);
           ValidateTypeAndShapeForScaleAndZP(ctx, 7, x_type->tensor_type().elem_type(), QuantParamTensorType::Scalar);
 

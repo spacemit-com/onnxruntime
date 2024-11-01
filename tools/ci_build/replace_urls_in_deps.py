@@ -11,6 +11,9 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+import wget
+import time
+import requests
 
 
 @dataclass(frozen=True)
@@ -24,8 +27,22 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     # The directory that contains downloaded zip files
     parser.add_argument("--new_dir", required=False)
-
+    parser.add_argument("--download", required=False, default="1", type=str)
     return parser.parse_args()
+
+
+def download_file(url, output_path):
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    try:
+        response = requests.get(url, stream=True, verify=False)
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:
+                    f.write(chunk)
+        return output_path
+    except:
+        return None
 
 
 def main():
@@ -56,7 +73,13 @@ def main():
         print(f"Making a copy to {backup_csv_file_path!s}")
         shutil.copy(csv_file_path, backup_csv_file_path)
 
-    print(f"Reading from {csv_file_path!s}")
+    print("Reading from %s" % str(csv_file_path))
+
+    auto_download = bool(int(args.download))
+    if auto_download:
+        if not os.path.isdir(new_dir.as_posix()):
+            os.makedirs(new_dir.as_posix())
+
     # Read the whole file into memory first
     with csv_file_path.open("r", encoding="utf-8") as f:
         depfile_reader = csv.reader(f, delimiter=";")
@@ -75,7 +98,22 @@ def main():
         depfile_writer = csv.writer(f, delimiter=";")
         for dep in deps:
             if dep.url.startswith("https://"):
-                new_url = new_dir / dep.url[8:]
+                new_url = new_dir / dep.url[8:].replace("/", "_")
+                if auto_download:
+                    if not os.path.exists(new_url.as_posix()):
+                        try_count = 0
+                        download_file_path = None
+                        print("download file {}".format(new_url.as_posix()))
+                        while download_file_path is None and try_count < 10:
+                            try:
+                                download_file_path = wget.download(dep.url, out=new_url.as_posix())
+                            except Exception as e:
+                                print("try download {} again. raise error: {}".format(dep.url, e))
+                                download_file_path = download_file(dep.url, new_url.as_posix())
+                                try_count += 1
+                                time.sleep(10)
+                    else:
+                        print("exist file {}".format(new_url.as_posix()))
                 depfile_writer.writerow([dep.name, new_url.as_posix(), dep.sha1_hash])
             else:
                 # Write the original thing back

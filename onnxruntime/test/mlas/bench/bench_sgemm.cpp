@@ -23,7 +23,7 @@ void SGEMM(benchmark::State& state, bool pack_b, bool trans_a, bool trans_b, flo
   std::vector<float> C(static_cast<size_t>(M * N));
 
   OrtThreadPoolParams tpo;
-  tpo.thread_pool_size = 8;
+  tpo.thread_pool_size = 4;
   tpo.auto_set_affinity = true;
   std::unique_ptr<onnxruntime::concurrency::ThreadPool> tp(
       onnxruntime::concurrency::CreateThreadPool(&onnxruntime::Env::Default(),
@@ -99,6 +99,9 @@ void SGEMM(benchmark::State& state, bool pack_b, bool trans_a, bool trans_b, flo
           tp.get());
     }
   }
+
+  state.counters["GFLOPS"] = benchmark::Counter(
+    uint64_t(state.iterations()) * 2 * M * K * N / 1e09, benchmark::Counter::kIsRate);
 }
 
 static void GemmSizeWithOne(benchmark::internal::Benchmark* b) {

@@ -354,6 +354,12 @@ def parse_arguments():
         help="[cross-compiling] Create ARM64X Binary.",
     )
     parser.add_argument(
+        "--riscv_ime_spec",
+        type=str,
+        default="",
+        help="RISC-V IME spec. e.g. --riscv_ime=spacemit-ime1",
+    )
+    parser.add_argument(
         "--riscv_toolchain_root",
         type=str,
         default="",
@@ -1105,11 +1111,24 @@ def generate_build_tree(
         if not args.skip_tests and not args.riscv_qemu_path:
             raise BuildError("The --riscv_qemu_path option is required for testing riscv64.")
 
+        spacemit_ime_spec = {
+            "spacemit-ime1": "RISCV64_SPACEMIT_IME1",
+            "spacemit-ime2": "RISCV64_SPACEMIT_IME2",
+        }.get(args.riscv_ime_spec, "NONE")
+        
+        rv_toolchain_file = os.path.join(source_dir, "cmake", "riscv64.toolchain.cmake" if spacemit_ime_spec == "NONE" 
+                                         else "riscv64.spacemit.toolchain.cmake")
+        
         cmake_args += [
             "-DRISCV_TOOLCHAIN_ROOT:PATH=" + args.riscv_toolchain_root,
             "-DRISCV_QEMU_PATH:PATH=" + args.riscv_qemu_path,
-            "-DCMAKE_TOOLCHAIN_FILE=" + os.path.join(source_dir, "cmake", "riscv64.toolchain.cmake"),
+            "-DCMAKE_TOOLCHAIN_FILE=" + rv_toolchain_file,
         ]
+        
+        if spacemit_ime_spec != "NONE":
+            cmake_args += [
+                "-DRISCV64_SPACEMIT_IME_SPEC=" + spacemit_ime_spec,
+            ]
 
     # By default on Windows we currently support only cross compiling for ARM/ARM64
     # (no native compilation supported through this script).
@@ -1128,8 +1147,8 @@ def generate_build_tree(
                 cmake_args.append("-DCMAKE_HIP_COMPILER_LAUNCHER=ccache")
     # By default cmake does not check TLS/SSL certificates. Here we turn it on.
     # But, in some cases you may also need to supply a CA file.
-    add_default_definition(cmake_extra_defines, "CMAKE_TLS_VERIFY", "ON")
-    add_default_definition(cmake_extra_defines, "FETCHCONTENT_QUIET", "OFF")
+    add_default_definition(cmake_extra_defines, "CMAKE_TLS_VERIFY", "OFF")
+    add_default_definition(cmake_extra_defines, "FETCHCONTENT_QUIET", "ON")
     if args.external_graph_transformer_path:
         cmake_args.append("-Donnxruntime_EXTERNAL_TRANSFORMER_SRC_PATH=" + args.external_graph_transformer_path)
     if args.use_winml:
@@ -1630,7 +1649,7 @@ def generate_build_tree(
                         "-pipe",
                         "-ggdb3",
                     ]
-                if is_linux() and platform.machine() == "x86_64":
+                if is_linux() and platform.machine() == "x86_64" and not args.rv64:
                     # The following flags needs GCC 8 and newer
                     cflags += ["-fstack-clash-protection"]
                     if not args.rv64:

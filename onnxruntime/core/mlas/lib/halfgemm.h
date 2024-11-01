@@ -503,12 +503,18 @@ extern const MLAS_HALFGEMM_DISPATCH MlasHalfGemmDispatchDefault;
 extern const MLAS_HALFGEMM_DISPATCH MlasHalfGemmDispatchNeon;
 #endif
 
+#if defined(MLAS_TARGET_RISCV64) && defined(__riscv_zfh)
+extern const MLAS_HALFGEMM_DISPATCH MlasHalfGemmDispatchRvv;
+#endif
+
 MLAS_FORCEINLINE
 const MLAS_HALFGEMM_DISPATCH*
 MlasHalfGemmGetDispatch()
 {
 #if defined(MLAS_F16VEC_INTRINSICS_SUPPORTED) && defined(MLAS_TARGET_ARM64)
     return &MlasHalfGemmDispatchNeon;
+#elif defined(MLAS_TARGET_RISCV64) && defined(__riscv_zfh)
+    return &MlasHalfGemmDispatchRvv;
 #else
     return &MlasHalfGemmDispatchDefault;
 #endif

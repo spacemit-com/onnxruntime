@@ -99,6 +99,17 @@ struct MLAS_SQNBIT_GEMM_DISPATCH {
 
     SQ4BitGemmPackQuantBDataSize_Fn* SQ4BitGemmPackQuantBDataSize = nullptr;
 
+    /** Gets size of packed quantized B data containing 4-bit integers. See MlasSQNBitGemmPackQuantBDataSize(). */
+    typedef size_t(SQ4BitGemmPackQuantBDataSizeWithScale_Fn)(
+        size_t N,
+        size_t K,
+        size_t BlkLen,
+        MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+        MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType
+    );
+
+    SQ4BitGemmPackQuantBDataSizeWithScale_Fn* SQ4BitGemmPackQuantBDataSizeWithScale = nullptr;
+
     /** Packs quantized B data containing 4-bit integers. See MlasSQNBitGemmPackQuantBData(). */
     typedef void(SQ4BitGemmPackQuantBData_Fn)(
         size_t N,
@@ -126,6 +137,22 @@ struct MLAS_SQNBIT_GEMM_DISPATCH {
     );
 
     SQ4BitGemmPackQuantBDataAndSumBlk_Fn* SQ4BitGemmPackQuantBDataAndBlkSum = nullptr;
+
+    typedef void(SQ4BitGemmPackQuantBDataAndSumBlkWithScale_Fn)(
+        size_t N,
+        size_t K,
+        size_t BlkLen,
+        MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+        MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
+        const std::byte* QuantBDataBegin,
+        const float* QuantBScaleBegin,
+        bool has_zp_input,
+        const std::byte* QuantBZPBegin,
+        PackedQuantBDataStruct& packed_quant_b,
+        MLAS_THREADPOOL* ThreadPool
+    );
+
+    SQ4BitGemmPackQuantBDataAndSumBlkWithScale_Fn* SQ4BitGemmPackQuantBDataAndBlkSumWithScale = nullptr;
 
     //
     // Workspace size calculation function prototypes.
@@ -198,6 +225,35 @@ struct MLAS_SQNBIT_GEMM_DISPATCH {
     );
 
     SQ4BitGemmM1Kernel_CompFp32_Fn* SQ4BitGemmM1Kernel_CompFp32 = nullptr;
+
+    /**
+     * @brief Multiply float matrix A with quantized 4-bit integer matrix B.
+     *        B is block quantized and column major.
+     *        This kernel handles the special case where M, the number of rows of A and C, is N.
+     *
+     * @param       A                   Supplies the B matrix.
+     * @param       B                   Supplies the B matrix.
+     * @param[out]  C                   Supplies the output C matrix.
+     * @param       CountK              Number of columns of A and rows of B.
+     * @param       CountM              Number of rows of A.
+     * @param       CountN              Number of columns of B and C.
+     * @param       lda                 Supplies the first dimension of matrix A.
+     * @param       ldc                 Supplies the first dimension of matrix C.
+     * @param       alpha               Supplies the scaler multiplier (see SGEMM definition).
+     */
+    typedef size_t(SQ4BitGemmMNKernel_CompFp32_Fn)(
+        const float* A,
+        const float* B,
+        float* C,
+        size_t CountK,
+        size_t CountM,
+        size_t CountN,
+        size_t lda,
+        size_t ldc,
+        float alpha
+    );
+
+    SQ4BitGemmMNKernel_CompFp32_Fn* SQ4BitGemmMNKernel_CompFp32 = nullptr;
 
     /**
      * @brief Dequantize B into the format expected by the Sgemm kernel.
@@ -309,6 +365,46 @@ struct MLAS_SQNBIT_GEMM_DISPATCH {
     );
 
     SQ4BitGemmKernel_CompInt8_Fn* SQ4BitGemmKernel_CompInt8 = nullptr;
+
+
+    /**
+     * @brief Multiply quantized 8-bit integer matrix A with quantized 4-bit integer matrix B.
+     *        A and B are block quantized and B is column major.
+     *
+     * @param       BlkLen              Number of values in a block.
+     * @param       QuantA              Supplies the quantized A matrix.
+                                        Binary data containing block quantized int8 data and scale values.
+     * @param       QuantBData          Supplies the quantized B matrix block data.
+     * @param       QuantBScale         Supplies the quantized B matrix block scale values.
+     * @param       QuantBZeroPoint     Supplies the quantized B matrix block zero point values. Optional.
+     * @param[out]  C                   Supplies the output C matrix.
+     * @param       CountM              Number of rows of A and C to process, an upper bound.
+     * @param       CountN              Number of columns of B and C to process.
+     * @param       CountK              Number of columns of A and rows of B.
+     * @param       BlockCountK         Number of blocks in one row of A and one column of B.
+     * @param       ldc                 Number of elements between adjacent rows of C.
+     * @param       Bias                Bias vector of length N.
+     * @param       ScaleStride         Scale stride 2 or 4.
+     *
+     * @return                          The number of rows of A and C that were processed, at most CountM.
+     */
+    typedef size_t(SQ4BitGemmKernel_CompInt8WithScale_Fn)(
+        size_t BlkLen,
+        const std::byte* QuantA,
+        const std::byte* QuantBData,
+        const float* QuantBScale,
+        const std::byte* QuantBZeroPoint,
+        float* C,
+        size_t CountM,
+        size_t CountN,
+        size_t CountK,
+        size_t BlockCountK,
+        size_t ldc,
+        const float* Bias,
+        const size_t ScaleStride
+    );
+
+    SQ4BitGemmKernel_CompInt8WithScale_Fn* SQ4BitGemmKernel_CompInt8WithScale = nullptr;
 
     /**
      * @brief Block quantize values from one row of matrix A from floats to quantized 8-bit integers.

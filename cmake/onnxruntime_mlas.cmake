@@ -674,6 +674,42 @@ endif()
           set(MLAS_SOURCE_IS_NOT_SET 0)
         endif()
     endif()
+
+    if(RISCV64 AND MLAS_SOURCE_IS_NOT_SET)
+        enable_language(ASM)
+        set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -march=rv64gcv_zfh")
+
+        set(mlas_platform_srcs
+          ${mlas_platform_srcs}
+          ${MLAS_SRC_DIR}/riscv64/sgemmc.cpp
+          ${MLAS_SRC_DIR}/riscv64/SgemmKernelRVV.S
+          ${MLAS_SRC_DIR}/riscv64/SgemmKernelRVV_update.S
+          ${MLAS_SRC_DIR}/riscv64/ErfKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/ExpKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/SoftmaxKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/TanhKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/CastF16F32RVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/LogisticKernelRVV.cpp
+          ${MLAS_SRC_DIR}/halfgemm_kernel_rvv.cpp
+          ${MLAS_SRC_DIR}/riscv64/HalfGemmKernelRVV.cpp
+        )
+
+        if (RISCV64_SPACEMIT_IME_SPEC)
+          target_compile_definitions(onnxruntime_mlas PRIVATE ${RISCV64_SPACEMIT_IME_SPEC})
+          set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/qgemm_kernel_spacemit_ime.cpp
+            ${MLAS_SRC_DIR}/sqnbitgemm_kernel_spacemit_ime.cpp
+            ${MLAS_SRC_DIR}/sqnbitgemm_kernel_spacemit_ime_int8.cpp
+            ${MLAS_SRC_DIR}/sqnbitgemm_kernel_spacemit_ime_fp32.cpp
+          )
+        endif()
+
+        if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
+          set(MLAS_SOURCE_IS_NOT_SET 0)
+        endif()
+    endif()
+
     if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH AND MLAS_SOURCE_IS_NOT_SET)
         file(GLOB_RECURSE mlas_platform_srcs
           "${MLAS_SRC_DIR}/scalar/*.cpp")

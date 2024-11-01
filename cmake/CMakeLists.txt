@@ -427,6 +427,11 @@ if (onnxruntime_ENABLE_NVTX_PROFILE)
   add_definitions(-DENABLE_NVTX_PROFILE=1)
 endif()
 
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-builtin-macro-redefined -U__FILE__ -D__FILE__='\"$(subst $(dir $<),,$<)\"'")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-builtin-macro-redefined -U__FILE__ -D__FILE__='\"$(subst $(dir $<),,$<)\"'")
+endif()
+
 if (onnxruntime_ENABLE_BITCODE)
   if (NOT (CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     message(FATAL_ERROR "iOS platform required for onnxruntime_ENABLE_BITCODE")

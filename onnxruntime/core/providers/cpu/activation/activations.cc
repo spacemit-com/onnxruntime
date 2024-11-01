@@ -8,6 +8,8 @@
 #ifndef DISABLE_CONTRIB_OPS
 #include "contrib_ops/cpu/activations.h"
 #endif
+#include "core/mlas/inc/mlas.h"
+
 
 using namespace onnxruntime::common;
 
@@ -120,6 +122,42 @@ void Tanh<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
   float* output_ptr = output + first;
   MlasComputeTanh(input + first, output_ptr, static_cast<size_t>(len));
 }
+
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+template <>
+void Relu<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
+  ptrdiff_t len = last - first;
+  float* output_ptr = output + first;
+  const auto *input_ptr = input + first;
+  struct MLAS_ACTIVATION activation;
+  activation.ActivationKind = MLAS_ACTIVATION_KIND::MlasReluActivation;
+  MlasActivation(&activation, input_ptr, output_ptr, nullptr, 1, len, len);
+}
+
+template <>
+void LeakyRelu<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
+  ptrdiff_t len = last - first;
+  float* output_ptr = output + first;
+  const auto *input_ptr = input + first;
+  struct MLAS_ACTIVATION activation;
+  activation.ActivationKind = MLAS_ACTIVATION_KIND::MlasLeakyReluActivation;
+  activation.Parameters.LeakyRelu.alpha = alpha;
+  MlasActivation(&activation, input_ptr, output_ptr, nullptr, 1, len, len);
+}
+
+template <>
+void HardSigmoid<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
+  ptrdiff_t len = last - first;
+  float* output_ptr = output + first;
+  const auto *input_ptr = input + first;
+  struct MLAS_ACTIVATION activation;
+  activation.ActivationKind = MLAS_ACTIVATION_KIND::MlasHardSigmoidActivation;
+  activation.Parameters.HardSigmoid.alpha = alpha;
+  activation.Parameters.HardSigmoid.beta = beta;
+  MlasActivation(&activation, input_ptr, output_ptr, nullptr, 1, len, len);
+}
+#endif
+
 }  // namespace functors
 
 }  // namespace onnxruntime

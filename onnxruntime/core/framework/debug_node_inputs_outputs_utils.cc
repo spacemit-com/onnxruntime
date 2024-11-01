@@ -367,7 +367,7 @@ const NodeDumpOptions& NodeDumpOptionsFromEnvironmentVariables() {
     // Preserve existing behavior of printing the shapes by default. Turn it off only if the user has requested so
     // explicitly by setting the value of the env variable to 0.
     opts.dump_flags = NodeDumpOptions::DumpFlags::None;
-    if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpShapeData, true)) {
+    if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpShapeData, false)) {
       opts.dump_flags |= NodeDumpOptions::DumpFlags::Shape;
     }
 
@@ -377,7 +377,7 @@ const NodeDumpOptions& NodeDumpOptionsFromEnvironmentVariables() {
     if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpOutputData, false)) {
       opts.dump_flags |= NodeDumpOptions::DumpFlags::OutputData;
     }
-    if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpNodePlacement, true)) {
+    if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpNodePlacement, false)) {
       opts.dump_flags |= NodeDumpOptions::DumpFlags::NodePlacement;
     }
     if (ParseEnvironmentVariableWithDefault<bool>(env_vars::kDumpStatisticsData, false)) {

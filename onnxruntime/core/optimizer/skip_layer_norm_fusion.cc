@@ -27,8 +27,7 @@ static bool IsSupportedDataType(const Node& node) {
 
 static bool CheckFirstAdd(Node& add, ProviderType providertype) {
   if (providertype != add.GetExecutionProviderType() ||
-      !IsSupportedDataType(add) ||
-      add.GetOutputEdgesCount() != 1) {
+      !IsSupportedDataType(add)) {
     return false;
   }
 
@@ -255,6 +254,7 @@ Status SkipLayerNormFusion::ApplyImpl(Graph& graph, bool& modified, int graph_le
     }
 
     NodeArg beta_place_holder("", nullptr);
+    NodeArg ln_extra_place_holder("", nullptr);
 
     // Get the inputs for the new SkipLayerNormalization node.
     InlinedVector<NodeArg*> skip_layer_norm_input_defs{p_add1->MutableInputDefs()[0],
@@ -283,11 +283,22 @@ Status SkipLayerNormFusion::ApplyImpl(Graph& graph, bool& modified, int graph_le
                               ln_node.GetExecutionProviderType());
     }
 
+    InlinedVector<NodeArg*> skip_layer_norm_output_defs;
+    for (auto& output_def : ln_node.MutableOutputDefs()) {
+      skip_layer_norm_output_defs.push_back(output_def);
+    }
+    if (p_add1->GetOutputEdgesCount() > 1) {
+      while (skip_layer_norm_output_defs.size() < 3) {
+        skip_layer_norm_output_defs.push_back(&ln_extra_place_holder);
+      }
+      skip_layer_norm_output_defs.push_back(p_add1->MutableOutputDefs()[0]);
+    }
+
     Node& skip_layer_norm_node = graph.AddNode(graph.GenerateNodeName("SkipLayerNormalization"),
                                                "SkipLayerNormalization",
                                                "fused SkipLayerNorm subgraphs ",
                                                skip_layer_norm_input_defs,
-                                               ln_node.MutableOutputDefs(), {}, kMSDomain);
+                                               skip_layer_norm_output_defs, {}, kMSDomain);
     // Get attribute "epsilon" from "LayerNormalization" node if available. Else, default value
     // will be used.
     NodeAttributes ln_attrs = ln_node.GetAttributes();

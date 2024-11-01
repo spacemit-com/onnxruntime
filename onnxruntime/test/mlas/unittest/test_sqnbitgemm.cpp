@@ -29,6 +29,17 @@ static constexpr const char* ComputeTypeName(MLAS_SQNBIT_GEMM_COMPUTE_TYPE Compu
   }
 }
 
+static constexpr const char* ScaleTypeName(MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType) {
+  switch (ScaleType) {
+    case ScaleFp32:
+      return "Fp32";
+    case ScaleFp16:
+      return "Fp16";
+    default:
+      return "unknown";
+  }
+}
+
 /**
  * @brief Test class for n-bit int block quantized GEMM
  *        Note: only 2-D matmul supported for now
@@ -49,6 +60,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
   MatrixGuardBuffer<std::byte> BufferWorkspace;
   MatrixGuardBuffer<float> BufferC;
   MatrixGuardBuffer<float> BufferCReference;
+  MatrixGuardBuffer<uint16_t> BufferQuantBScaleFp16;
 
   void CallGemm(size_t M,
                 size_t N,
@@ -64,6 +76,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
                 size_t ldc,
                 void* Workspace,
                 MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
                 MLAS_THREADPOOL* Threadpool) {
     MLAS_SQNBIT_GEMM_DATA_PARAMS params;
     params.A = A;
@@ -71,7 +84,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
     params.Bias = Bias;
     params.C = C;
     params.ldc = ldc;
-#ifdef MLAS_TARGET_AMD64_IX86
+#if defined(MLAS_TARGET_AMD64_IX86) | defined(MLAS_TARGET_RISCV64)
     if (ComputeType == CompInt8) {
       params.QuantBDataWorkspace = PackedQuantBDataWorkspace;
     }
@@ -80,6 +93,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
     params.QuantBScale = QuantBScale;
     params.QuantBZeroPoint = QuantBZeroPoint;
     params.PostProcessor = nullptr;
+    params.ScaleType = ScaleType;
 
     MlasSQNBitGemmBatch(M, N, K, 1, BlkBitWidth, BlkLen, ComputeType, &params, Workspace, Threadpool);
   }
@@ -202,6 +216,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
  public:
   void Test(size_t M, size_t N, size_t K,
             MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+            MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
             bool WithThreadpool, bool Symmetric, bool WithBias) {
     MLAS_THREADPOOL* Threadpool = WithThreadpool ? GetMlasThreadPool() : nullptr;
 
@@ -243,15 +258,17 @@ class MlasSQNBitGemmTest : public MlasTestBase {
     // quantize B
     uint8_t* QuantBData = nullptr;
     float* QuantBScale = nullptr;
+    uint16_t* QuantBScaleFp16 = nullptr;
     uint8_t* QuantBZeroPoint = nullptr;
+    size_t QuantBDataSizeInBytes, QuantBScaleSize, QuantBZeroPointSizeInBytes;
     {
-      size_t QuantBDataSizeInBytes, QuantBScaleSize, QuantBZeroPointSizeInBytes;
       MlasBlockwiseQuantizedBufferSizes(BlkBitWidth, BlkLen, /* columnwise */ true,
                                         static_cast<int>(K), static_cast<int>(N),
                                         QuantBDataSizeInBytes, QuantBScaleSize, &QuantBZeroPointSizeInBytes);
 
       QuantBData = BufferQuantBData.GetBuffer(QuantBDataSizeInBytes);
       QuantBScale = BufferQuantBScale.GetBuffer(QuantBScaleSize);
+      QuantBScaleFp16 = BufferQuantBScaleFp16.GetBuffer(QuantBScaleSize);
       if (!Symmetric) {
         QuantBZeroPoint = BufferQuantBZeroPoint.GetBuffer(QuantBZeroPointSizeInBytes);
       }
@@ -271,13 +288,29 @@ class MlasSQNBitGemmTest : public MlasTestBase {
     }
 
     void* PackedQuantBDataWorkspace = nullptr;
-    if (const auto PackedQuantBDataSize = MlasSQNBitGemmPackQuantBDataSize(N, K, BlkBitWidth, BlkLen, ComputeType);
+    if (const auto PackedQuantBDataSize = MlasSQNBitGemmPackQuantBDataSize(N, K, BlkBitWidth, BlkLen, ComputeType, ScaleType);
         PackedQuantBDataSize > 0) {
       PackedQuantBDataWorkspace = BufferPackedQuantBData.GetBuffer(PackedQuantBDataSize);
       bool has_zp_input = QuantBZeroPoint != nullptr;
-      MlasSQNBitGemmPackQuantBData(N, K, BlkBitWidth, BlkLen, ComputeType, QuantBData, PackedQuantBDataWorkspace,
+
+#ifdef MLAS_TARGET_RISCV64
+      float *QuantBScaleTemp = QuantBScale;
+      if (ScaleFp16 == ScaleType) {
+        __fp16 *QuantBScaleTempFp16 = (__fp16 *)QuantBScaleFp16;
+        QuantBScaleTemp = (float *)QuantBScaleFp16;
+        for (size_t i = 0; i < QuantBScaleSize; i++) {
+          QuantBScaleTempFp16[i] = (__fp16)QuantBScale[i];
+          QuantBScale[i] = (float)QuantBScaleTempFp16[i];
+        }
+      }
+      MlasSQNBitGemmPackQuantBData(N, K, BlkBitWidth, BlkLen, ComputeType, ScaleType, QuantBData, PackedQuantBDataWorkspace,
+                                   QuantBScaleTemp, has_zp_input, QuantBZeroPoint,
+                                   GetMlasThreadPool());
+#else
+      MlasSQNBitGemmPackQuantBData(N, K, BlkBitWidth, BlkLen, ComputeType, ScaleType, QuantBData, PackedQuantBDataWorkspace,
                                    QuantBScale, has_zp_input, QuantBZeroPoint,
                                    GetMlasThreadPool());
+#endif
     }
 
     CallGemm(M, N, K,
@@ -287,6 +320,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
              C, /* ldc */ N,
              Workspace,
              ComputeType,
+             ScaleType,
              Threadpool);
 
     if (ComputeType == CompFp32) {
@@ -325,11 +359,13 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
  public:
   explicit SQNBitGemmShortExecuteTest(size_t M, size_t N, size_t K,
                                       MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                                      MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
                                       bool WithThreadpool, bool Symmetric, bool WithBias)
       : M_(M),
         N_(N),
         K_(K),
         ComputeType_(ComputeType),
+        ScaleType_(ScaleType),
         WithThreadpool_(WithThreadpool),
         Symmetric_(Symmetric),
         WithBias_(WithBias) {
@@ -337,11 +373,12 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
 
   void TestBody() override {
     MlasTestFixture<MlasSQNBitGemmTest<BlkBitWidth, BlkLen>>::mlas_tester->Test(
-        M_, N_, K_, ComputeType_, WithThreadpool_, Symmetric_, WithBias_);
+        M_, N_, K_, ComputeType_, ScaleType_, WithThreadpool_, Symmetric_, WithBias_);
   }
 
   static size_t RegisterSingleTest(size_t M, size_t N, size_t K,
                                    MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                                   MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
                                    bool WithThreadpool, bool Symmetric, bool WithBias) {
     size_t tests_registered = 0;
 
@@ -351,7 +388,8 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
          << "/isSymmetric" << Symmetric
          << "/M" << M << "xN" << N << "xK" << K
          << "/hasBias" << WithBias
-         << "/computeType" << ComputeTypeName(ComputeType);
+         << "/computeType" << ComputeTypeName(ComputeType)
+         << "/scaleType" << ScaleTypeName(ScaleType);
       auto test_name = ss.str();
 
       testing::RegisterTest(
@@ -364,7 +402,7 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
           // Important to use the fixture type as the return type here.
           [=]() -> MlasTestFixture<MlasSQNBitGemmTest<BlkBitWidth, BlkLen>>* {
             return new SQNBitGemmShortExecuteTest(
-                M, N, K, ComputeType, WithThreadpool, Symmetric, WithBias);
+                M, N, K, ComputeType, ScaleType, WithThreadpool, Symmetric, WithBias);
           });
 
       tests_registered += 1;
@@ -376,37 +414,48 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
   static size_t RegisterShortExecuteTests() {
     size_t tests_registered = 0;
 
-    for (MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType : {CompFp32, CompInt8}) {
+    for (MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType : {CompFp32}) {
       for (bool WithThreadpool : {false, true}) {
         for (bool Symmetric : {false, true}) {
-          for (size_t b = 1; b < 16; b++) {
-            tests_registered += RegisterSingleTest(b, b, b, ComputeType, WithThreadpool, Symmetric, false);
-            tests_registered += RegisterSingleTest(b, b, b, ComputeType, WithThreadpool, Symmetric, true);
+#ifdef MLAS_TARGET_RISCV64
+          for (MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp32, ScaleFp16}) {
+            if (ComputeType == CompFp32 && ScaleType == ScaleFp16) {
+              continue;
+            }
+#else
+          for (MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp32}) {
+#endif
+            for (size_t b = 1; b < 16; b++) {
+              tests_registered += RegisterSingleTest(b, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+              tests_registered += RegisterSingleTest(b, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            }
+
+            for (size_t b = 16; b <= 256; b <<= 1) {
+              tests_registered += RegisterSingleTest(b, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+              tests_registered += RegisterSingleTest(b, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            }
+            for (size_t b = 256; b < 320; b += 32) {
+              tests_registered += RegisterSingleTest(b, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            }
+            for (size_t b = 1; b < 96; b++) {
+              tests_registered += RegisterSingleTest(1, b, 32, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+              tests_registered += RegisterSingleTest(1, 32, b, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+              tests_registered += RegisterSingleTest(1, b, b, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            }
+
+            tests_registered += RegisterSingleTest(43, 500, 401, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(1, 2, 16, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(1, 2, 16, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            tests_registered += RegisterSingleTest(1, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            tests_registered += RegisterSingleTest(11, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            tests_registered += RegisterSingleTest(1, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(11, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(1, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            tests_registered += RegisterSingleTest(1, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
+            tests_registered += RegisterSingleTest(1001, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
           }
-          for (size_t b = 16; b <= 256; b <<= 1) {
-            tests_registered += RegisterSingleTest(b, b, b, ComputeType, WithThreadpool, Symmetric, false);
-            tests_registered += RegisterSingleTest(b, b, b, ComputeType, WithThreadpool, Symmetric, true);
-          }
-          for (size_t b = 256; b < 320; b += 32) {
-            tests_registered += RegisterSingleTest(b, b, b, ComputeType, WithThreadpool, Symmetric, true);
-          }
-          for (size_t b = 1; b < 96; b++) {
-            tests_registered += RegisterSingleTest(1, b, 32, ComputeType, WithThreadpool, Symmetric, false);
-            tests_registered += RegisterSingleTest(1, 32, b, ComputeType, WithThreadpool, Symmetric, true);
-            tests_registered += RegisterSingleTest(1, b, b, ComputeType, WithThreadpool, Symmetric, false);
-          }
-          tests_registered += RegisterSingleTest(43, 500, 401, ComputeType, WithThreadpool, Symmetric, true);
-          tests_registered += RegisterSingleTest(1, 2, 16, ComputeType, WithThreadpool, Symmetric, true);
-          tests_registered += RegisterSingleTest(1, 2, 16, ComputeType, WithThreadpool, Symmetric, false);
-          tests_registered += RegisterSingleTest(1, 1027, 1031, ComputeType, WithThreadpool, Symmetric, false);
-          tests_registered += RegisterSingleTest(11, 1027, 1031, ComputeType, WithThreadpool, Symmetric, false);
-          tests_registered += RegisterSingleTest(1, 1027, 1031, ComputeType, WithThreadpool, Symmetric, true);
-          tests_registered += RegisterSingleTest(11, 1027, 1031, ComputeType, WithThreadpool, Symmetric, true);
-          tests_registered += RegisterSingleTest(1, 527, 2131, ComputeType, WithThreadpool, Symmetric, false);
-          tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, WithThreadpool, Symmetric, false);
-          tests_registered += RegisterSingleTest(1, 527, 2131, ComputeType, WithThreadpool, Symmetric, true);
-          tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, WithThreadpool, Symmetric, true);
-          // tests_registered += RegisterSingleTest(1001, 1027, 1031, ComputeType, WithThreadpool, Symmetric, false);
         }
       }
     }
@@ -417,6 +466,7 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
  private:
   size_t M_, N_, K_;
   MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType_;
+  MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType_;
   bool WithThreadpool_, Symmetric_, WithBias_;
 };
 

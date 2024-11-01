@@ -206,9 +206,18 @@ MlasGemmQuantScaleSumBuffer(
     int32_t Scale
 )
 {
+#if defined(MLAS_TARGET_RISCV64) && defined(MLAS_TARGET_RISCV64)
+    for (size_t vl; N > 0; N -= vl, Output += vl, Input += vl) {
+        vl = __riscv_vsetvl_e32m4(N);
+        vint32m4_t lhs = __riscv_vle32_v_i32m4(Input, vl);
+        vint32m4_t dst = __riscv_vmul_vx_i32m4(lhs, Scale, vl);
+        __riscv_vse32_v_i32m4(Output, dst, vl);
+    }
+#else
     for (size_t n = 0; n < N; n++) {
         Output[n] = Input[n] * Scale;
     }
+#endif
 }
 
 
@@ -551,6 +560,8 @@ Return Value:
     int32_t* ColumnSumBuffer = reinterpret_cast<int32_t*>(p);
     p += colSumSize;
     int32_t* ZeroPointBBuffer = reinterpret_cast<int32_t*>(p);
+    p += colSumSize;
+    [[maybe_unused]] int32_t* C_temp = reinterpret_cast<int32_t*>(p);
 
     const size_t K = Shape->K;
 
@@ -895,6 +906,8 @@ MlasGemmQuantGetDispatch(
     if (GetMlasPlatform().GemmU8X8Dispatch == &MlasGemm8X8DispatchPOWER10) {
         GemmQuantDispatch = GetMlasPlatform().GemmU8X8Dispatch;
     }
+#elif defined(MLAS_TARGET_RISCV64) && defined(RISCV64_SPACEMIT_IME1) && defined(__linux__)
+    GemmQuantDispatch = &MlasGemmX8X8DispatchSpacemiTIme_BASE;
 #endif
 
     if (nullptr == GemmQuantDispatch) {

@@ -679,6 +679,24 @@ Return Value:
 
 #endif // MLAS_TARGET_LARCH64
 
+
+#if defined(MLAS_TARGET_RISCV64)
+    this->LogisticKernelRoutine = MlasLogisticKernel_RVV;
+    this->ComputeExpF32Kernel = MlasComputeExpF32Kernel_RVV;
+    this->ErfKernelRoutine = MlasErfKernel_RVV;
+    this->TanhKernelRoutine = MlasTanhKernel_RVV;
+    this->ReduceMaximumF32Kernel = MlasReduceMaximumF32Kernel_RVV;
+    this->ComputeSumExpF32Kernel = MlasComputeSumExpF32Kernel_RVV;
+    this->ComputeLogSoftmaxOutputF32Kernel = MlasComputeLogSoftmaxOutputF32Kernel_RVV;
+    this->ComputeSoftmaxOutputF32Kernel = MlasComputeSoftmaxOutputF32Kernel_RVV;
+
+    this->CastF16ToF32Kernel = &MlasCastF16ToF32Kernel_RVV;
+    this->CastF32ToF16Kernel = &MlasCastF32ToF16Kernel_RVV;
+#if defined(RISCV64_SPACEMIT_IME1)
+    this->SQNBitGemmDispatch = &MlasSQNBitGemmDispatchSpacemiTIme;
+#endif
+#endif // MLAS_TARGET_RISCV64
+
 }
 
 size_t

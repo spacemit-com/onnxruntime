@@ -122,13 +122,13 @@ class MatrixGuardBuffer {
     return GetFilledBuffer(
         Elements,
         [](T* start, size_t size) {
-          constexpr int offset = -21;
           constexpr int range = 43;
+          constexpr int offset = -(range / 2);
 
-          int FillValue = 11;
+          int FillValue = (range + offset + size) % range;
           T* FillAddress = start;
           for (size_t i = 0; i < size; i++) {
-            auto itemv = FillValue - offset;
+            auto itemv = (FillValue + offset);
             *FillAddress++ = (T)(itemv);
 
             FillValue += 7;

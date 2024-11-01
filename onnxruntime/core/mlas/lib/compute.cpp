@@ -273,7 +273,7 @@ Return Value:
 
 --*/
 {
-#if defined(MLAS_TARGET_AMD64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_RISCV64)
     GetMlasPlatform().ComputeExpF32Kernel(Input, Output, N);
 #else
     MlasComputeExpF32Kernel(Input, Output, N);
@@ -850,7 +850,7 @@ Return Value:
         // Find the maximum value for the row.
         //
 
-#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_RISCV64)
         float Maximum = GetMlasPlatform().ReduceMaximumF32Kernel(Input, D);
 #else
         float Maximum = MlasReduceMaximumF32Kernel(Input, D);
@@ -865,7 +865,7 @@ Return Value:
         // compute the sum of these exponential functions.
         //
         float* Temp = LogSoftmax ? nullptr : Output;
-#if defined(MLAS_TARGET_AMD64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_RISCV64)
         float Accumulation = GetMlasPlatform().ComputeSumExpF32Kernel(Input, Temp, D, &NegativeMaximum);
 #else
         float Accumulation = MlasComputeSumExpF32Kernel(Input, Temp, D, &NegativeMaximum);
@@ -881,7 +881,7 @@ Return Value:
             //
             float Parameters[] = {NegativeMaximum, std::log(Accumulation)};
 
-#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_RISCV64)
             GetMlasPlatform().ComputeLogSoftmaxOutputF32Kernel(Input, Output, D, Parameters);
 #else
             MlasComputeLogSoftmaxOutputF32Kernel(Input, Output, D, Parameters);
@@ -893,7 +893,7 @@ Return Value:
             //
             float Parameters[] = {1.0f / Accumulation};
 
-#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_RISCV64)
             GetMlasPlatform().ComputeSoftmaxOutputF32Kernel(Output, D, Parameters);
 #else
             MlasComputeSoftmaxOutputF32Kernel(Output, D, Parameters);

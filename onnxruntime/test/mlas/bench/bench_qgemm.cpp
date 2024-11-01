@@ -76,28 +76,36 @@ void QGEMM(benchmark::State& state, bool pack_b, bool a_is_signed) {
   for (auto _ : state) {
     MlasGemmBatch(gemm_shape, gemm_data_vec.data(), batch, tp.get());
   }
+
+  state.counters["GFLOPS"] = benchmark::Counter(
+    uint64_t(state.iterations()) * 2 * batch * M * K * N / 1e09, benchmark::Counter::kIsRate);
 }
 
 static void QGemmSize(benchmark::internal::Benchmark* b) {
   b->ArgNames(qgemm_arg_names);
   // Args for  "M", "N", "K", "Batch", "Threads"
 
+  b->Args({384, 1024, 1024, 1, 1});
+  b->Args({384, 1024, 3072, 1, 1});
+  b->Args({384, 1024, 4096, 1, 1});
+  b->Args({384, 4096, 1024, 1, 1});
+
   b->Args({384, 1024, 1024, 1, 4});
   b->Args({384, 1024, 3072, 1, 4});
   b->Args({384, 1024, 4096, 1, 4});
   b->Args({384, 4096, 1024, 1, 4});
-  b->Args({384, 1024, 1024, 1, 16});
-  b->Args({384, 1024, 3072, 1, 16});
-  b->Args({384, 1024, 4096, 1, 16});
-  b->Args({384, 4096, 1024, 1, 16});
-  b->Args({1536, 1024, 1024, 1, 16});
-  b->Args({1536, 1024, 3072, 1, 16});
-  b->Args({1536, 1024, 4096, 1, 16});
-  b->Args({1536, 4096, 1024, 1, 16});
-  b->Args({3072, 1024, 1024, 1, 16});
-  b->Args({3072, 1024, 3072, 1, 16});
-  b->Args({3072, 1024, 4096, 1, 16});
-  b->Args({3072, 4096, 1024, 1, 16});
+  // b->Args({384, 1024, 1024, 1, 16});
+  // b->Args({384, 1024, 3072, 1, 16});
+  // b->Args({384, 1024, 4096, 1, 16});
+  // b->Args({384, 4096, 1024, 1, 16});
+  // b->Args({1536, 1024, 1024, 1, 16});
+  // b->Args({1536, 1024, 3072, 1, 16});
+  // b->Args({1536, 1024, 4096, 1, 16});
+  // b->Args({1536, 4096, 1024, 1, 16});
+  // b->Args({3072, 1024, 1024, 1, 16});
+  // b->Args({3072, 1024, 3072, 1, 16});
+  // b->Args({3072, 1024, 4096, 1, 16});
+  // b->Args({3072, 4096, 1024, 1, 16});
 }
 
 BENCHMARK_CAPTURE(QGEMM, UnsignedAPackB, true, false)->Apply(QGemmSize)->UseRealTime();

@@ -123,7 +123,7 @@ static Status MatchAndProcess(
       break;
     }
 
-    LOGS(logger, VERBOSE) << "Matched " << node.OpType();
+    LOGS(logger, VERBOSE) << "Matched " << node.OpType() << " " << node.Name();
 
     const auto& selector_action_entry = *selector_action_entry_ptr;
     const auto& action = *selector_action_entry.action;

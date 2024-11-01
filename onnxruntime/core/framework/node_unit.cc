@@ -170,10 +170,10 @@ Status QDQ::NodeGroup::CanCreateNodeGroup(const GraphViewer& graph_viewer,
     const bool dq_has_single_output_edge_to_target =
         dq_node->GetOutputEdgesCount() == 1 &&
         dq_node->OutputEdgesBegin()->GetNode().Index() == target_node.Index();
-    ORT_RETURN_IF_NOT(dq_has_single_output_edge_to_target,
-                      "QDQ node group cannot have DQ that doesn't have a single output edge to the target node. "
-                      "DQ node: ",
-                      dq_node->Name(), ", target node: ", target_node.Name());
+    // ORT_RETURN_IF_NOT(dq_has_single_output_edge_to_target,
+    //                   "QDQ node group cannot have DQ that doesn't have a single output edge to the target node. "
+    //                   "DQ node: ",
+    //                   dq_node->Name(), ", target node: ", target_node.Name());
   }
 
   // an output from the target node can have either Q consumers or direct consumers. it cannot have both.

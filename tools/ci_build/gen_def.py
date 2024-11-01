@@ -11,6 +11,7 @@ def parse_arguments():
     parser.add_argument("--version_file", required=True, help="VERSION_NUMBER file")
     parser.add_argument("--style", required=True, choices=["gcc", "vc", "xcode"])
     parser.add_argument("--config", required=True, nargs="+")
+    parser.add_argument("--extern_symbols_file", default=None, required=False, type=str, help="extern_symbols_file")
     return parser.parse_args()
 
 
@@ -31,6 +32,12 @@ for c in args.config:
                 print("dup symbol: %s", line)
                 exit(-1)
             symbols.add(line)
+extern_symbols = set()
+if args.extern_symbols_file is not None and os.path.exists(args.extern_symbols_file):
+    with open(args.extern_symbols_file) as file:
+        for extern_sym in file.readlines():
+            extern_symbols.add(extern_sym.strip())
+
 symbols = sorted(symbols)
 
 symbol_index = 1
@@ -44,7 +51,7 @@ with open(args.output, "w") as file:
         file.write(f"VERS_{VERSION_STRING} {{\n")
         file.write(" global:\n")
 
-    for symbol in symbols:
+    for symbol in symbols + sorted(extern_symbols):
         if args.style == "vc":
             file.write(" %s @%d\n" % (symbol, symbol_index))
         elif args.style == "xcode":

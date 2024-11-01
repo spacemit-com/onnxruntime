@@ -902,6 +902,60 @@ Return Value:
     }
 }
 
+#if defined(MLAS_TARGET_RISCV64)
+template<>
+void
+MLASCALL
+MlasQuantizeLinear<int8_t>(
+    const float* Input,
+    int8_t* Output,
+    size_t N,
+    float Scale,
+    int8_t ZeroPoint
+    )
+{
+    float div_scale = 1.0 / Scale;
+    float * input_ptr =  const_cast<float *>(Input);
+    int8_t * output_ptr = Output;
+
+    for (size_t vl; N > 0; N -= vl, input_ptr += vl, output_ptr += vl) {
+        vl = __riscv_vsetvl_e32m4(N);
+        vfloat32m4_t vec_f32 = __riscv_vle32_v_f32m4(input_ptr, vl);
+        vec_f32 = __riscv_vfmul_vf_f32m4(vec_f32, div_scale, vl);
+        vec_f32 = __riscv_vfadd_vf_f32m4(vec_f32, ZeroPoint, vl);
+        vint8m1_t vec_out = __riscv_vnclip_wx_i8m1(__riscv_vfncvt_x_f_w_i16m2(vec_f32, vl), 0, vl);
+        __riscv_vse8_v_i8m1(output_ptr, vec_out, vl);
+    }
+}
+
+template<>
+void
+MLASCALL
+MlasQuantizeLinear<uint8_t>(
+    const float* Input,
+    uint8_t* Output,
+    size_t N,
+    float Scale,
+    uint8_t ZeroPoint
+    )
+{
+    float div_scale = 1.0 / Scale;
+    float * input_ptr =  const_cast<float *>(Input);
+    uint8_t * output_ptr = Output;
+
+    for (size_t vl; N > 0; N -= vl, input_ptr += vl, output_ptr += vl) {
+        vl = __riscv_vsetvl_e32m4(N);
+        vfloat32m4_t vec_f32 = __riscv_vle32_v_f32m4(input_ptr, vl);
+        vec_f32 = __riscv_vfmul_vf_f32m4(vec_f32, div_scale, vl);
+        vec_f32 = __riscv_vfadd_vf_f32m4(vec_f32, ZeroPoint, vl);
+        vint16m2_t vec_i16 = __riscv_vfncvt_x_f_w_i16m2(vec_f32, vl);
+        vec_i16 = __riscv_vmax_vx_i16m2(vec_i16, 0, vl);
+        vuint8m1_t vec_out = __riscv_vnclipu_wx_u8m1(__riscv_vreinterpret_v_i16m2_u16m2(vec_i16), 0, vl);
+        __riscv_vse8_v_u8m1(output_ptr, vec_out, vl);
+    }
+}
+#endif
+
 #if !defined(MLAS_TARGET_POWER)
 template
 void
@@ -1961,6 +2015,121 @@ MlasRequantizeOutput(
     }
 }
 
+#elif defined(MLAS_TARGET_RISCV64)
+
+template <typename OutputType, bool PerColumnScale, bool WithBias>
+void
+MLASCALL
+MlasRequantizeOutputImpl(
+    const int32_t* Input,
+    size_t InputLeadingDimension,
+    OutputType* Output,
+    size_t OutputLeadingDimension,
+    const int32_t* Bias,
+    const float* Scale,
+    OutputType ZeroPoint,
+    size_t StartM,
+    size_t StartN,
+    size_t CountM,
+    size_t CountN
+) {
+    const float PerMatrixScaleValue = PerColumnScale ? 0.0f : *Scale;
+
+    if (nullptr != Bias) {
+        Bias += StartN;
+    }
+    if constexpr (PerColumnScale) {
+        Scale += StartN;
+    }
+
+    Input += StartM * InputLeadingDimension + StartN;
+    Output += StartM * OutputLeadingDimension + StartN;
+
+    //
+    // Step through each row of the output matrix.
+    //
+
+    while (CountM-- > 0) {
+
+        const int32_t* bias = Bias;
+        const float* scale = Scale;
+        size_t n = CountN;
+
+        auto* RowInput = Input;
+        auto* RowOutput = Output;
+
+        for (size_t vl; n > 0; n -= vl, RowInput += vl, RowOutput += vl) {
+            vl = __riscv_vsetvl_e32m4(n);
+            vint32m4_t IntegerVector = __riscv_vle32_v_i32m4(RowInput, vl);
+
+            if constexpr (WithBias) {
+                IntegerVector = __riscv_vadd_vv_i32m4(IntegerVector, __riscv_vle32_v_i32m4(bias, vl), vl);
+                bias += vl;
+            }
+
+            vfloat32m4_t FloatVector = __riscv_vfcvt_f_x_v_f32m4(IntegerVector, vl);
+            if constexpr (PerColumnScale) {
+                FloatVector = __riscv_vfmul_vv_f32m4(FloatVector, __riscv_vle32_v_f32m4(scale, vl), vl);
+                scale += vl;
+            } else {
+                FloatVector = __riscv_vfmul_vf_f32m4(FloatVector, PerMatrixScaleValue, vl);
+            }
+            FloatVector =  __riscv_vfadd_vf_f32m4(FloatVector, ZeroPoint, vl);
+
+            if constexpr (std::is_signed<OutputType>::value) {
+                vint16m2_t I16Vector = __riscv_vfncvt_x_f_w_i16m2(FloatVector, vl);
+                vint8m1_t OutVector = __riscv_vnclip_wx_i8m1(I16Vector, 0, vl);
+                __riscv_vse8_v_i8m1(RowOutput, OutVector, vl);
+            } else {
+                vuint16m2_t U16Vector = __riscv_vfncvt_xu_f_w_u16m2(FloatVector, vl);
+                vuint8m1_t OutVector = __riscv_vnclipu_wx_u8m1(U16Vector, 0, vl);
+                __riscv_vse8_v_u8m1(RowOutput, OutVector, vl);
+            }
+        }
+
+        // Next Row
+        Input += InputLeadingDimension;
+        Output += OutputLeadingDimension;
+    }
+}
+
+template <typename OutputType>
+void
+MLASCALL
+MlasRequantizeOutput(
+    const int32_t* Input,
+    size_t InputLeadingDimension,
+    OutputType* Output,
+    size_t OutputLeadingDimension,
+    const int32_t* Bias,
+    const float* Scale,
+    bool PerColumnScale,
+    OutputType ZeroPoint,
+    size_t StartM,
+    size_t StartN,
+    size_t CountM,
+    size_t CountN
+    )
+{
+    if (PerColumnScale && Bias != nullptr) {
+        MlasRequantizeOutputImpl<OutputType, true, true>(
+            Input, InputLeadingDimension, Output, OutputLeadingDimension, Bias, Scale, ZeroPoint, StartM, StartN, CountM, CountN
+        );
+    } else if (!PerColumnScale && Bias != nullptr) {
+        MlasRequantizeOutputImpl<OutputType, false, true>(
+            Input, InputLeadingDimension, Output, OutputLeadingDimension, Bias, Scale, ZeroPoint, StartM, StartN, CountM, CountN
+        );
+    } else if (PerColumnScale && Bias == nullptr) {
+        MlasRequantizeOutputImpl<OutputType, true, false>(
+            Input, InputLeadingDimension, Output, OutputLeadingDimension, Bias, Scale, ZeroPoint, StartM, StartN, CountM, CountN
+        );
+    } else if (!PerColumnScale && Bias == nullptr) {
+        MlasRequantizeOutputImpl<OutputType, false, false>(
+            Input, InputLeadingDimension, Output, OutputLeadingDimension, Bias, Scale, ZeroPoint, StartM, StartN, CountM, CountN
+        );
+    }
+}
+
 #else
 
 template <typename OutputType>
@@ -2113,7 +2282,7 @@ Return Value:
 
 --*/
 {
-#if defined(MLAS_TARGET_AMD64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_RISCV64)
     GetMlasPlatform().ReduceMinimumMaximumF32Kernel(Input, Min, Max, N);
 #else
     MlasReduceMinimumMaximumF32Kernel(Input, Min, Max, N);

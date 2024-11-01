@@ -47,6 +47,19 @@ struct MLAS_BIAS_ADDITION<true>
 template<>
 struct MLAS_BIAS_ADDITION<false>
 {
+#if defined(MLAS_TARGET_RISCV64)
+    void LoadNext(const float*& Bias, size_t vl)
+    {
+        MLAS_UNREFERENCED_PARAMETER(Bias);
+        MLAS_UNREFERENCED_PARAMETER(vl);
+    }
+
+    vfloat32m1_t Add(vfloat32m1_t Value, size_t vl)
+    {
+        MLAS_UNREFERENCED_PARAMETER(vl);
+        return Value;
+    }
+#else
     void LoadNext(const float*& Bias)
     {
         MLAS_UNREFERENCED_PARAMETER(Bias);
@@ -61,6 +74,7 @@ struct MLAS_BIAS_ADDITION<false>
     {
         return Value;
     }
+#endif
 };
 
 //
@@ -78,6 +92,13 @@ struct MLAS_ACTIVATION_FUNCTION<MlasIdentityActivation>
         MLAS_UNREFERENCED_PARAMETER(Activation);
     }
 
+#if defined(MLAS_TARGET_RISCV64)
+    vfloat32m1_t Activate(vfloat32m1_t Value, size_t vl)
+    {
+        MLAS_UNREFERENCED_PARAMETER(vl);
+        return Value;
+    }
+#else
     MLAS_FLOAT32X4 Activate(MLAS_FLOAT32X4 Value)
     {
         return Value;
@@ -87,11 +108,22 @@ struct MLAS_ACTIVATION_FUNCTION<MlasIdentityActivation>
     {
         return Value;
     }
+#endif
 };
 
 template<>
 struct MLAS_ACTIVATION_FUNCTION<MlasReluActivation>
 {
+    MLAS_ACTIVATION_FUNCTION(const MLAS_ACTIVATION* Activation)
+    {
+        MLAS_UNREFERENCED_PARAMETER(Activation);
+    }
+#if defined(MLAS_TARGET_RISCV64)
+    vfloat32m1_t Activate(vfloat32m1_t Value, size_t vl)
+    {
+        return __riscv_vfmax_vf_f32m1(Value, 0.0f, vl);
+    }
+#else
     const MLAS_FLOAT32X4 ZeroFloat32x4 = MlasZeroFloat32x4();
 
     MLAS_ACTIVATION_FUNCTION(const MLAS_ACTIVATION* Activation)
@@ -112,11 +144,28 @@ struct MLAS_ACTIVATION_FUNCTION<MlasReluActivation>
         return std::max(Value, 0.0f);
 #endif
     }
+#endif
 };
 
 template<>
 struct MLAS_ACTIVATION_FUNCTION<MlasLeakyReluActivation>
 {
+#if defined(MLAS_TARGET_RISCV64)
+    float AlphaBroadcast;
+
+    MLAS_ACTIVATION_FUNCTION(const MLAS_ACTIVATION* Activation)
+    {
+        AlphaBroadcast = Activation->Parameters.LeakyRelu.alpha;
+    }
+
+    vfloat32m1_t Activate(vfloat32m1_t Value, size_t vl)
+    {
+        vfloat32m1_t pos = __riscv_vfmax_vf_f32m1(Value, 0.0f, vl);
+        vfloat32m1_t neg = __riscv_vfmin_vf_f32m1(Value, 0.0f, vl);
+        neg = __riscv_vfmul_vf_f32m1(neg, AlphaBroadcast, vl);
+        return __riscv_vfadd_vv_f32m1(pos, neg, vl);
+    }
+#else
     const MLAS_FLOAT32X4 ZeroFloat32x4 = MlasZeroFloat32x4();
 
     MLAS_FLOAT32X4 AlphaBroadcast;
@@ -160,11 +209,28 @@ struct MLAS_ACTIVATION_FUNCTION<MlasLeakyReluActivation>
         return (Value >= 0.0f) ? Value : ValueTimesAlpha;
 #endif
     }
+#endif
 };
 
 template<>
 struct MLAS_ACTIVATION_FUNCTION<MlasClipActivation>
 {
+#if defined(MLAS_TARGET_RISCV64)
+    float MinimumBroadcast;
+    float MaximumBroadcast;
+
+    MLAS_ACTIVATION_FUNCTION(const MLAS_ACTIVATION* Activation)
+    {
+        MinimumBroadcast = Activation->Parameters.Clip.minimum;
+        MaximumBroadcast = Activation->Parameters.Clip.maximum;
+    }
+
+    vfloat32m1_t Activate(vfloat32m1_t Value, size_t vl)
+    {
+        Value = __riscv_vfmax_vf_f32m1(Value, MinimumBroadcast, vl);
+        return __riscv_vfmin_vf_f32m1(Value, MaximumBroadcast, vl);
+    }
+#else
     MLAS_FLOAT32X4 MinimumBroadcast;
     MLAS_FLOAT32X4 MaximumBroadcast;
 
@@ -193,11 +259,34 @@ struct MLAS_ACTIVATION_FUNCTION<MlasClipActivation>
         return Value;
 #endif
     }
+#endif
 };
 
 template<>
 struct MLAS_ACTIVATION_FUNCTION<MlasHardSigmoidActivation>
 {
+#if defined(MLAS_TARGET_RISCV64)
+    float AlphaBroadcast;
+    float BetaBroadcast;
+    float MinimumBroadcast;
+    float MaximumBroadcast;
+
+    MLAS_ACTIVATION_FUNCTION(const MLAS_ACTIVATION* Activation)
+    {
+        AlphaBroadcast = Activation->Parameters.HardSigmoid.alpha;
+        BetaBroadcast = Activation->Parameters.HardSigmoid.beta;
+        MinimumBroadcast = 0.0f;
+        MaximumBroadcast = 1.0f;
+    }
+
+    vfloat32m1_t Activate(vfloat32m1_t Value, size_t vl)
+    {
+        Value = __riscv_vfmul_vf_f32m1(Value, AlphaBroadcast, vl);
+        Value = __riscv_vfadd_vf_f32m1(Value, BetaBroadcast, vl);
+        Value = __riscv_vfmax_vf_f32m1(Value, MinimumBroadcast, vl);
+        return __riscv_vfmin_vf_f32m1(Value, MaximumBroadcast, vl);
+    }
+#else
     MLAS_FLOAT32X4 AlphaBroadcast;
     MLAS_FLOAT32X4 BetaBroadcast;
     MLAS_FLOAT32X4 MinimumBroadcast;
@@ -232,6 +321,7 @@ struct MLAS_ACTIVATION_FUNCTION<MlasHardSigmoidActivation>
         return Value;
 #endif
     }
+#endif
 };
 
 template<MLAS_ACTIVATION_KIND ActivationKind, bool AddBias>
@@ -273,17 +363,34 @@ Return Value:
 --*/
 {
     MLAS_ACTIVATION_FUNCTION<ActivationKind> ActivationFunction(Activation);
-    MLAS_BIAS_ADDITION<AddBias> BiasAddition;
+    [[maybe_unused]] MLAS_BIAS_ADDITION<AddBias> BiasAddition;
 
     //
     // Step through each row of the output matrix.
     //
+    [[maybe_unused]] float* BiasPtr = const_cast<float*>(Bias);
 
     while (M-- > 0) {
 
         float* buffer = Buffer;
         size_t n = N;
 
+#if defined(MLAS_TARGET_RISCV64)
+        if constexpr (AddBias) {
+            vfloat32m1_t BiasBroadcast = __riscv_vfmv_v_f_f32m1(*BiasPtr++, __riscv_vsetvlmax_e32m1());
+            for (size_t vl; n > 0; n -= vl, buffer += vl) {
+                vl = __riscv_vsetvl_e32m1(n);
+                vfloat32m1_t Vector = __riscv_vfadd_vv_f32m1(BiasBroadcast, __riscv_vle32_v_f32m1(buffer, vl), vl);
+                __riscv_vse32_v_f32m1(buffer, ActivationFunction.Activate(Vector, vl), vl);
+            }
+        } else {
+            for (size_t vl; n > 0; n -= vl, buffer += vl) {
+                vl = __riscv_vsetvl_e32m1(n);
+                vfloat32m1_t Vector = __riscv_vle32_v_f32m1(buffer, vl);
+                __riscv_vse32_v_f32m1(buffer, ActivationFunction.Activate(Vector, vl), vl);
+            }
+        }
+#else
         BiasAddition.LoadNext(Bias);
 
         if (n >= 4) {
@@ -304,7 +411,103 @@ Return Value:
             *buffer++ = ActivationFunction.Activate(Scalar);
             n -= 1;
         }
+#endif
+        Buffer += ldc;
+    }
+}
 
+template<MLAS_ACTIVATION_KIND ActivationKind, bool AddBias>
+void
+MlasActivationKernel(
+    const MLAS_ACTIVATION* Activation,
+    const float* Input,
+    float* Buffer,
+    const float* Bias,
+    size_t M,
+    size_t N,
+    size_t ldc
+    )
+/*++
+
+Routine Description:
+
+    This routine steps over the output matrix and invokes the templated bias
+    addition and activation functions.
+
+Arguments:
+
+    Activation - Supplies the parameters for the activation.
+
+    Buffer - Supplies the output matrix.
+
+    Bias - Supplies the optional bias vector.
+
+    M - Supplies the number of elements of the bias vector and the number of
+        rows in the output matrix.
+
+    N - Supplies the number of columns of the output matrix.
+
+    ldc - Supplies the number of elements per row of the output matrix.
+
+Return Value:
+
+    None.
+
+--*/
+{
+    MLAS_ACTIVATION_FUNCTION<ActivationKind> ActivationFunction(Activation);
+    [[maybe_unused]] MLAS_BIAS_ADDITION<AddBias> BiasAddition;
+
+    //
+    // Step through each row of the output matrix.
+    //
+    [[maybe_unused]] float* BiasPtr = const_cast<float*>(Bias);
+    float* InputPtr = const_cast<float*>(Input);
+
+    while (M-- > 0) {
+        
+        float* input = InputPtr;
+        float* buffer = Buffer;
+        size_t n = N;
+
+#if defined(MLAS_TARGET_RISCV64)
+        if constexpr (AddBias) {
+            vfloat32m1_t BiasBroadcast = __riscv_vfmv_v_f_f32m1(*BiasPtr++, __riscv_vsetvlmax_e32m1());
+            for (size_t vl; n > 0; n -= vl, buffer += vl, input += vl) {
+                vl = __riscv_vsetvl_e32m1(n);
+                vfloat32m1_t Vector = __riscv_vfadd_vv_f32m1(BiasBroadcast, __riscv_vle32_v_f32m1(input, vl), vl);
+                __riscv_vse32_v_f32m1(buffer, ActivationFunction.Activate(Vector, vl), vl);
+            }
+        } else {
+            for (size_t vl; n > 0; n -= vl, buffer += vl, input += vl) {
+                vl = __riscv_vsetvl_e32m1(n);
+                vfloat32m1_t Vector = __riscv_vle32_v_f32m1(input, vl);
+                __riscv_vse32_v_f32m1(buffer, ActivationFunction.Activate(Vector, vl), vl);
+            }
+        }
+#else
+        BiasAddition.LoadNext(Bias);
+
+        if (n >= 4) {
+
+            do {
+
+                MLAS_FLOAT32X4 Vector = BiasAddition.Add(MlasLoadFloat32x4(input));
+                MlasStoreFloat32x4(buffer, ActivationFunction.Activate(Vector));
+                buffer += 4;
+                n -= 4;
+
+            } while (n >= 4);
+        }
+
+        while (n > 0) {
+
+            float Scalar = BiasAddition.Add(*buffer);
+            *buffer++ = ActivationFunction.Activate(Scalar);
+            n -= 1;
+        }
+#endif
+        InputPtr += ldc;
         Buffer += ldc;
     }
 }
@@ -403,6 +606,53 @@ Return Value:
         MlasActivationKernel<ActivationKind, true>(Activation, Buffer, Bias, M, N, ldc);
     } else {
         MlasActivationKernel<ActivationKind, false>(Activation, Buffer, Bias, M, N, ldc);
+    }
+}
+
+template<MLAS_ACTIVATION_KIND ActivationKind>
+inline
+void
+MlasActivationKernel(
+    const MLAS_ACTIVATION* Activation,
+    const float* Input,
+    float* Buffer,
+    const float* Bias,
+    size_t M,
+    size_t N,
+    size_t ldc
+    )
+/*++
+
+Routine Description:
+
+    This routine invokes the appropriate activation kernel based on the
+    optional bias vector.
+
+Arguments:
+
+    Activation - Supplies the parameters for the activation.
+
+    Buffer - Supplies the output matrix.
+
+    Bias - Supplies the optional bias vector.
+
+    M - Supplies the number of elements of the bias vector and the number of
+        rows in the output matrix.
+
+    N - Supplies the number of columns of the output matrix.
+
+    ldc - Supplies the number of elements per row of the output matrix.
+
+Return Value:
+
+    None.
+
+--*/
+{
+    if (Bias != nullptr) {
+        MlasActivationKernel<ActivationKind, true>(Activation, Input, Buffer, Bias, M, N, ldc);
+    } else {
+        MlasActivationKernel<ActivationKind, false>(Activation, Input, Buffer, Bias, M, N, ldc);
     }
 }
 
@@ -509,6 +759,121 @@ Return Value:
         case MlasHardSigmoidActivation:
         {
             MlasActivationKernel<MlasHardSigmoidActivation>(Activation, Buffer, Bias, M, N, ldc);
+            break;
+        }
+
+        case MlasActivationKindCount:
+        {
+            MLAS_THROW_EX(std::runtime_error, "bad mlas activation kind");
+            break;
+        }
+    }
+}
+
+void
+MLASCALL
+MlasActivation(
+    const MLAS_ACTIVATION* Activation,
+    const float* Input,
+    float* Buffer,
+    const float* Bias,
+    size_t M,
+    size_t N,
+    size_t ldc
+    )
+/*++
+
+Routine Description:
+
+    This routine applies an activation function to the output matrix after
+    optionally adding a bias vector.
+
+Arguments:
+
+    Activation - Supplies the parameters for the activation.
+
+    Buffer - Supplies the output matrix.
+
+    Bias - Supplies the optional bias vector.
+
+    M - Supplies the number of elements of the bias vector and the number of
+        rows in the output matrix.
+
+    N - Supplies the number of columns of the output matrix.
+
+    ldc - Supplies the number of elements per row of the output matrix.
+
+Return Value:
+
+    None.
+
+--*/
+{
+    switch (Activation->ActivationKind) {
+
+        case MlasIdentityActivation:
+        {
+            MlasActivationKernel<MlasIdentityActivation>(Activation, Input, Buffer, Bias, M, N, ldc);
+            break;
+        }
+
+        case MlasReluActivation:
+        {
+            MlasActivationKernel<MlasReluActivation>(Activation, Input, Buffer, Bias, M, N, ldc);
+            break;
+        }
+
+        case MlasLeakyReluActivation:
+        {
+            MlasActivationKernel<MlasLeakyReluActivation>(Activation, Input, Buffer, Bias, M, N, ldc);
+            break;
+        }
+
+        case MlasTanhActivation:
+        {
+            if (Bias != nullptr) {
+                MlasActivationKernel<MlasIdentityActivation, true>(Activation, Input, Buffer, Bias, M, N, ldc);
+            }
+
+            if (N == ldc) {
+                MlasComputeTanh(Buffer, Buffer, M * N);
+            } else {
+                while (M-- > 0) {
+                    MlasComputeTanh(Buffer, Buffer, N);
+                    Buffer += ldc;
+                }
+            }
+
+            break;
+        }
+
+        case MlasLogisticActivation:
+        {
+            if (Bias != nullptr) {
+                MlasActivationKernel<MlasIdentityActivation, true>(Activation, Input, Buffer, Bias, M, N, ldc);
+            }
+
+            if (N == ldc) {
+                MlasComputeLogistic(Buffer, Buffer, M * N);
+            } else {
+                while (M-- > 0) {
+                    MlasComputeLogistic(Buffer, Buffer, N);
+                    Buffer += ldc;
+                }
+            }
+
+            break;
+        }
+
+        case MlasClipActivation:
+        {
+            MlasActivationKernel<MlasClipActivation>(Activation, Input, Buffer, Bias, M, N, ldc);
+            break;
+        }
+
+        case MlasHardSigmoidActivation:
+        {
+            MlasActivationKernel<MlasHardSigmoidActivation>(Activation, Input, Buffer, Bias, M, N, ldc);
             break;
         }
 

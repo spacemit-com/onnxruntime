@@ -15,6 +15,7 @@
 #include "core/framework/session_state.h"
 #include "core/framework/op_kernel_context_internal.h"
 #include "core/framework/utils.h"
+#include "core/mlas/inc/mlas.h"
 
 #if defined DEBUG_NODE_INPUTS_OUTPUTS
 #include "core/framework/debug_node_inputs_outputs_utils.h"
@@ -481,6 +482,9 @@ onnxruntime::Status ExecuteKernel(StreamExecutionContext& ctx,
         status = kernel_ctx.SetOutputMLValue(0, cache.get()->at(cached_arg_name));
       }
 #else
+      const auto& node = p_kernel->Node();
+      LOGS(logger, VERBOSE) << "kernel compute " << node.OpType() << " node. Name:'" << node.Name() << "' Placement:'"
+      << node.GetExecutionProviderType() << "'";
       status = p_kernel->Compute(&kernel_ctx);
 #endif
     }

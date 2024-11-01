@@ -73,6 +73,20 @@ Abstract:
 #if defined(__loongarch64)
 #define MLAS_TARGET_LARCH64
 #endif
+
+#if defined(__riscv)
+#define MLAS_TARGET_RISCV
+#if defined(_LP64)
+#define MLAS_TARGET_RISCV64
+#else
+#define MLAS_TARGET_RISCV32
+#endif
+#endif
+
+#if defined(MLAS_TARGET_RISCV64) && defined(__riscv_v) && (__riscv_v >= 1000000)
+#define MLAS_RVV10_SUPPORTED
+#endif
+
 //
 // Define the support levels for the target architecture.
 //
@@ -194,6 +208,18 @@ MlasActivation(
     size_t ldc
     );
 
+void
+MLASCALL
+MlasActivation(
+    const MLAS_ACTIVATION* Activation,
+    const float* Input,
+    float* Buffer,
+    const float* Bias,
+    size_t M,
+    size_t N,
+    size_t ldc
+    );
+
 //
 // Matrix/matrix multiply routines.
 // C := alpha * op(A) * op(B) + beta * C
@@ -213,6 +239,7 @@ struct MLAS_SGEMM_DATA_PARAMS {
     float alpha = 1.0f;       /**< Supplies the scalar alpha multiplier (see SGEMM definition) */
     float beta = 0.0f;        /**< Supplies the scalar beta multiplier (see SGEMM definition) */
     bool BIsPacked = false;   /**< Whether B is pre-packed */
+    const float *bias = nullptr; /**< bias per column>*/
 };
 
 /**

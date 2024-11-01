@@ -40,6 +40,14 @@ typedef enum {
 } MLAS_SQNBIT_GEMM_COMPUTE_TYPE;
 
 /**
+ * @brief Define B Scale data-type of block quantization.
+ */
+typedef enum {
+    ScaleFp32 = 0,
+    ScaleFp16,
+} MLAS_SQNBIT_GEMM_SCALE_TYPE;
+
+/**
  * @brief Data parameters for float/n-bit quantized int GEMM routine.
  */
 struct MLAS_SQNBIT_GEMM_DATA_PARAMS {
@@ -54,6 +62,7 @@ struct MLAS_SQNBIT_GEMM_DATA_PARAMS {
     float* C = nullptr;                             ///< address of result matrix
     size_t ldc = 0;                                 ///< leading dimension of C
 
+    MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType = MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp32; ///< datatype of B scale(FP32 or FP16).
     ///< optional post processing to apply to result matrix
     MLAS_GEMM_POSTPROCESSOR<float>* PostProcessor = nullptr;
 };
@@ -155,7 +164,8 @@ MlasSQNBitGemmPackQuantBDataSize(
     size_t K,
     size_t BlkBitWidth,
     size_t BlkLen,
-    MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType
+    MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+    MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType = MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp32
 );
 
 /**
@@ -197,5 +207,21 @@ MlasSQNBitGemmPackQuantBData(
     const void* QuantBScale,
     bool has_zp_input,
     const void* QuantBZeroPoint,
-    MLAS_THREADPOOL* ThreadPool
+    MLAS_THREADPOOL* ThreadPool = nullptr
+);
+
+void MLASCALL
+MlasSQNBitGemmPackQuantBData(
+    size_t N,
+    size_t K,
+    size_t BlkBitWidth,
+    size_t BlkLen,
+    MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+    MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
+    const void* QuantBData,
+    void* PackedQuantBDataAndOrBlkSum,
+    const void* QuantBScale,
+    bool has_zp_input,
+    const void* QuantBZeroPoint,
+    MLAS_THREADPOOL* ThreadPool = nullptr
 );

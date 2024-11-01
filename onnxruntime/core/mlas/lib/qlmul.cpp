@@ -590,6 +590,145 @@ MlasQLinearMulKernel(
 
 #endif
 
+#if defined(MLAS_TARGET_RISCV64)
+template<>
+void
+MlasQLinearMulKernel<int8_t, false>(
+    const int8_t* InputA,
+    float ScaleA,
+    int32_t ZeroPointA,
+    const int8_t* InputB,
+    float ScaleB,
+    int32_t ZeroPointB,
+    float ScaleC,
+    int32_t ZeroPointC,
+    int8_t* OutputC,
+    size_t N
+    )
+{
+    const int16_t MinimumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::min()) - ZeroPointC;
+    const int16_t MaximumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::max()) - ZeroPointC;
+
+    const float ScaleRatio = ScaleA * ScaleB / ScaleC;
+
+    // assert(ScaleRatio >= 0x1.0p-16f);
+    // assert(ScaleRatio < 0x1.0p+8f);
+
+    const int8_t va_zero_point = ZeroPointA;
+    const int8_t vb_zero_point = ZeroPointB;
+    const int8_t vc_zero_point = ZeroPointC;
+
+    // Compute requantization parameters.
+    const int32_t scale_bits = (int32_t)(ScaleRatio * (1 << 12)) ;
+
+    __asm__ volatile(
+        //"csrrsi    t0,       vxrm,     1           \t\n"
+        "LOOP%=:                                   \t\n"
+        "vsetvli   t0,       %[n],     e8,       m1\t\n"
+
+        "vle8.v    v0,       (%[a])                \t\n"
+        "add       %[a],     %[a],     t0          \t\n"
+        "vle8.v    v2,       (%[b])                \t\n"
+        "add       %[b],     %[b],     t0          \t\n"
+
+        "vwsub.vx  v4,       v0,       %[azp]      \t\n"
+        "vwsub.vx  v8,       v2,       %[bzp]      \t\n"
+
+        "vsetvli   t0,       %[n],     e16,      m2\t\n"
+        "vwmul.vv  v16,      v4,       v8          \t\n"
+
+        "vsetvli   t0,       %[n],     e32,      m4\t\n"
+        "vmul.vx   v24,      v16,      %[m]        \t\n"
+        "vsetvli   t0,       %[n],     e16,      m2\t\n"
+        "vnclip.wi v16,      v24,      12           \t\n"
+
+        "vmax.vx   v16,      v16,      %[min]      \n\t"
+        "vmin.vx   v16,      v16,      %[max]      \n\t"
+        "vsadd.vx  v16,      v16,      %[ozp]      \t\n"
+
+        "vsetvli   t0,       %[n],     e8,       m1\t\n"
+        "vnclip.wx v16,      v16,      zero        \t\n"
+        "vse8.v    v16,      (%[y])                \t\n"
+        "add       %[y],     %[y],     t0          \t\n"
+        "sub       %[n],     %[n],     t0          \t\n"
+        "bnez      %[n],     LOOP%=                \t\n"
+        : [n] "+r"(N), [a] "+r"(InputA), [b] "+r"(InputB), [y] "+r"(OutputC)
+        : [azp] "r"(va_zero_point), [bzp] "r"(vb_zero_point), [m] "r" (scale_bits),
+          [ozp] "r"(vc_zero_point), [min] "r"(MinimumValue), [max] "r"(MaximumValue)
+        : "cc", "t0");
+}
+
+template<>
+void
+MlasQLinearMulKernel<int8_t, true>(
+    const int8_t* InputA,
+    float ScaleA,
+    int32_t ZeroPointA,
+    const int8_t* InputB,
+    float ScaleB,
+    int32_t ZeroPointB,
+    float ScaleC,
+    int32_t ZeroPointC,
+    int8_t* OutputC,
+    size_t N
+    )
+{
+    const int16_t MinimumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::min()) - ZeroPointC;
+    const int16_t MaximumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::max()) - ZeroPointC;
+
+    const float ScaleRatio = ScaleA * ScaleB / ScaleC;
+
+    // assert(ScaleRatio >= 0x1.0p-16f);
+    // assert(ScaleRatio < 0x1.0p+8f);
+
+    const int8_t va_zero_point = ZeroPointA;
+    const int8_t vc_zero_point = ZeroPointC;
+
+    const int8_t  b = *InputB;
+    const int16_t b_zero_point = ZeroPointB;
+    const int16_t mul = (int16_t)b - b_zero_point;
+
+    // Compute requantization parameters.
+    const int32_t scale_bits = (int32_t)(ScaleRatio * (1 << 12)) ;
+
+    __asm__ volatile(
+        "vsetvli   t0,       %[n],     e16,      m2\t\n"
+        "vmv.v.x   v8,       %[b]                  \t\n"
+
+        "LOOP%=:                                   \t\n"
+        "vsetvli   t0,       %[n],     e8,       m1\t\n"
+
+        "vle8.v    v0,       (%[a])                \t\n"
+        "add       %[a],     %[a],     t0          \t\n"
+
+        "vwsub.vx  v4,       v0,       %[azp]      \t\n"
+
+        "vsetvli   t0,       %[n],     e16,      m2\t\n"
+        "vwmul.vv  v16,      v4,       v8          \t\n"
+
+        "vsetvli   t0,       %[n],     e32,      m4\t\n"
+        "vmul.vx   v24,      v16,      %[m]        \t\n"
+
+        "vsetvli   t0,       %[n],     e16,      m2\t\n"
+        "vnclip.wi v16,      v24,      12          \t\n"
+
+        "vmax.vx   v16,      v16,      %[min]      \n\t"
+        "vmin.vx   v16,      v16,      %[max]      \n\t"
+        "vsadd.vx  v16,      v16,      %[ozp]      \t\n"
+
+        "vsetvli   t0,       %[n],     e8,       m1\t\n"
+        "vnclip.wx v16,      v16,      zero        \t\n"
+        "vse8.v    v16,      (%[y])                \t\n"
+        "add       %[y],     %[y],     t0          \t\n"
+        "sub       %[n],     %[n],     t0          \t\n"
+        "bnez      %[n],     LOOP%=                \t\n"
+        : [n] "+r"(N), [a] "+r"(InputA), [y] "+r"(OutputC)
+        : [b] "r"(mul), [azp] "r"(va_zero_point), [bzp] "r"(b_zero_point), [m] "r"(scale_bits),
+          [ozp] "r"(vc_zero_point), [min] "r"(MinimumValue), [max] "r"(MaximumValue)
+        : "cc", "t0");
+}
+#endif
+
 template <typename DataType>
 void
 MLASCALL

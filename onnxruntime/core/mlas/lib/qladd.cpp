@@ -717,6 +717,162 @@ MlasQLinearAddKernel(
     }
 }
 
+#if defined(MLAS_TARGET_RISCV64)
+
+bool MlasCalcQLinearAddParameters(
+    float ScaleRatio_AC,
+    float ScaleRatio_BC,
+    int32_t& Shift,
+    int32_t& MultiplierA,
+    int32_t& MultiplierB) {
+  constexpr float MinScaleRatio = 6.103515625e-05f;  // std::stof("0x1.0p-14f");
+  constexpr float MaxScaleRatio = 256.0f;            //std::stof("0x1.0p+8f");
+
+  if (ScaleRatio_AC < MinScaleRatio || ScaleRatio_AC >= MaxScaleRatio ||
+      ScaleRatio_BC < MinScaleRatio || ScaleRatio_BC >= MaxScaleRatio) {
+    return false;
+  }
+
+  const float GreaterScaleRatio = std::max(ScaleRatio_AC, ScaleRatio_BC);
+  const int32_t GreaterExponent = (int32_t)(MlasBitsOfFp32(GreaterScaleRatio) >> 23) - 127;
+  Shift = 21 - GreaterExponent;
+  if (Shift > 31 || Shift < 13) return false;
+
+  const float MultiplierFloatValue = MlasFp32FromBits((uint32_t)(21 - GreaterExponent + 127) << 23);
+  MultiplierA = (int32_t)lrintf(ScaleRatio_AC * MultiplierFloatValue);
+  MultiplierB = (int32_t)lrintf(ScaleRatio_BC * MultiplierFloatValue);
+  return ((MultiplierA < 0x00400000 && MultiplierB < 0x00400000) &&
+          (MultiplierA >= 0x00200000 || MultiplierB >= 0x00200000));  // the greater one must fullfil this check
+}
+
+template<>
+void
+MlasQLinearAddKernelHelper<int8_t, false>(
+    const int8_t *InputA,
+    float ScaleA,
+    int32_t ZeroPointA,
+    const int8_t *InputB,
+    float ScaleB,
+    int32_t ZeroPointB,
+    float ScaleC,
+    int32_t ZeroPointC,
+    int8_t *OutputC,
+    size_t N)
+{
+    const int16_t MinimumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::min()) - ZeroPointC;
+    const int16_t MaximumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::max()) - ZeroPointC;
+
+    int32_t Shift, MultiplierA, MultiplierB;
+    const float ScaleRatio_AC = ScaleA / ScaleC;
+    const float ScaleRatio_BC = ScaleB / ScaleC;
+
+    if (!MlasCalcQLinearAddParameters(ScaleRatio_AC, ScaleRatio_BC, Shift, MultiplierA, MultiplierB)) {
+        MlasQLinearAddKernelRawHelper<int8_t, false>(
+            InputA, ScaleA, ZeroPointA, InputB, ScaleB, ZeroPointB, ScaleC, ZeroPointC, OutputC, N);
+        return;
+    }
+
+    __asm__ volatile(
+                    "LOOP%=:                                   \t\n"
+                    "vsetvli   t0,       %[n],     e8,       m2\t\n"
+                    "vle8.v    v0,       (%[a])                \t\n"
+                    "add       %[a],     %[a],     t0          \t\n"
+                    "vle8.v    v2,       (%[b])                \t\n"
+                    "add       %[b],     %[b],     t0          \t\n"
+                    "vwsub.vx  v4,       v0,       %[zpa]      \t\n"
+                    "vwsub.vx  v8,       v2,       %[zpb]      \t\n"
+
+                    "vsetvli   t0,       %[n],     e32,      m8\t\n"
+                    "vsext.vf2 v16,      v4                    \t\n"
+                    "vsext.vf2 v24,      v8                    \t\n"
+                    "vmul.vx   v16,      v16,      %[ma]       \t\n"
+                    "vmacc.vx  v16,      %[mb],    v24         \t\n"
+
+                    "vsetvli   t0,       %[n],     e16,      m4\t\n"
+                    "vnclip.wx v16,      v16,      %[rs]       \t\n"
+                    "vmax.vx   v16,      v16,      %[min]      \n\t"
+                    "vmin.vx   v16,      v16,      %[max]      \n\t"
+                    "vsadd.vx  v16,      v16,      %[zpc]      \t\n"
+                    "vsetvli   t0,       %[n],     e8,       m2\t\n"
+                    "vnclip.wx v16,      v16,      zero        \t\n"
+                    "vse8.v    v16,      (%[c])                \t\n"
+                    "add       %[c],     %[c],     t0          \t\n"
+                    "sub       %[n],     %[n],     t0          \t\n"
+                    "bnez      %[n],     LOOP%=                \t\n"
+                    : [n] "+r"(N), [a] "+r"(InputA), [b] "+r"(InputB), [c] "+r"(OutputC)
+                    : [zpa] "r"(ZeroPointA), [zpb] "r"(ZeroPointB), [ma] "r"(MultiplierA), [mb] "r"(MultiplierB),
+                        [rs] "r"(Shift), [zpc] "r"(ZeroPointC), [min] "r"(MinimumValue), [max] "r"(MaximumValue)
+                    : "cc", "t0");
+}
+
+template<>
+void
+MlasQLinearAddKernelHelper<int8_t, true>(
+    const int8_t *InputA,
+    float ScaleA,
+    int32_t ZeroPointA,
+    const int8_t *InputB,
+    float ScaleB,
+    int32_t ZeroPointB,
+    float ScaleC,
+    int32_t ZeroPointC,
+    int8_t *OutputC,
+    size_t N)
+{
+    const int16_t MinimumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::min()) - ZeroPointC;
+    const int16_t MaximumValue = static_cast<int16_t>(std::numeric_limits<int8_t>::max()) - ZeroPointC;
+
+    int32_t Shift, MultiplierA, MultiplierB;
+    const float ScaleRatio_AC = ScaleA / ScaleC;
+    const float ScaleRatio_BC = ScaleB / ScaleC;
+
+    if (!MlasCalcQLinearAddParameters(ScaleRatio_AC, ScaleRatio_BC, Shift, MultiplierA, MultiplierB)) {
+        MlasQLinearAddKernelRawHelper<int8_t, true>(
+            InputA, ScaleA, ZeroPointA, InputB, ScaleB, ZeroPointB, ScaleC, ZeroPointC, OutputC, N);
+        return;
+    }
+
+    const int8_t  b = *InputB;
+    const int16_t b_zero_point = ZeroPointB;
+    const int16_t add = (int16_t)b - b_zero_point;
+    __asm__ volatile(
+                    "vsetvli   t0,       %[n],     e16,      m4\t\n"
+                    "vmv.v.x   v8,       %[b]                  \t\n"
+
+                    "LOOP%=:                                   \t\n"
+                    "vsetvli   t0,       %[n],     e8,       m2\t\n"
+                    "vle8.v    v0,       (%[a])                \t\n"
+                    "add       %[a],     %[a],     t0          \t\n"
+                    // "vle8.v    v2,       (%[b])                \t\n"
+                    // "add       %[b],     %[b],     t0          \t\n"
+                    "vwsub.vx  v4,       v0,       %[zpa]      \t\n"
+                    // "vwsub.vx  v8,       v2,       %[zpb]      \t\n"
+
+                    "vsetvli   t0,       %[n],     e32,      m8\t\n"
+                    "vsext.vf2 v16,      v4                    \t\n"
+                    "vsext.vf2 v24,      v8                    \t\n"
+                    "vmul.vx   v16,      v16,      %[ma]       \t\n"
+                    "vmacc.vx  v16,      %[mb],    v24         \t\n"
+
+                    "vsetvli   t0,       %[n],     e16,      m4\t\n"
+                    "vnclip.wx v16,      v16,      %[rs]       \t\n"
+                    "vmax.vx   v16,      v16,      %[min]      \n\t"
+                    "vmin.vx   v16,      v16,      %[max]      \n\t"
+                    "vsadd.vx  v16,      v16,      %[zpc]      \t\n"
+                    "vsetvli   t0,       %[n],     e8,       m2\t\n"
+                    "vnclip.wx v16,      v16,      zero        \t\n"
+                    "vse8.v    v16,      (%[c])                \t\n"
+                    "add       %[c],     %[c],     t0          \t\n"
+                    "sub       %[n],     %[n],     t0          \t\n"
+                    "bnez      %[n],     LOOP%=                \t\n"
+                    : [n] "+r"(N), [a] "+r"(InputA), [c] "+r"(OutputC)
+                    : [b] "r"(add), [zpa] "r"(ZeroPointA), [zpb] "r"(ZeroPointB), [ma] "r"(MultiplierA), [mb] "r"(MultiplierB),
+                        [rs] "r"(Shift), [zpc] "r"(ZeroPointC), [min] "r"(MinimumValue), [max] "r"(MaximumValue)
+                    : "cc", "t0");
+}
+
+#endif
+
 template<>
 void
 MLASCALL

@@ -68,6 +68,7 @@ add_custom_command(OUTPUT ${SYMBOL_FILE} ${CMAKE_CURRENT_BINARY_DIR}/generated_s
     --version_file "${ONNXRUNTIME_ROOT}/../VERSION_NUMBER" --src_root "${ONNXRUNTIME_ROOT}"
     --config ${ONNXRUNTIME_PROVIDER_NAMES} --style=${OUTPUT_STYLE} --output ${SYMBOL_FILE}
     --output_source ${CMAKE_CURRENT_BINARY_DIR}/generated_source.c
+    --extern_symbols_file "${ONNXRUNTIME_ROOT}/../cmake/onnxruntime_extern_symbols.txt"
   DEPENDS ${SYMBOL_FILES}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 

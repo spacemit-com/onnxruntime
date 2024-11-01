@@ -23,6 +23,7 @@ void RunSQNBitGemmBenchmark(size_t BlkLen,
                             bool Symmetric,
                             bool HasBias,
                             MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                            MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
                             benchmark::State& state) {
   if (!MlasIsSQNBitGemmAvailable(BlkBitWidth, BlkLen, ComputeType)) {
     state.SkipWithMessage("SQNBitGemm is not available with the given configuration on the current machine.");
@@ -97,6 +98,11 @@ void RunSQNBitGemmBenchmark(size_t BlkLen,
   for (auto _ : state) {
     MlasSQNBitGemmBatch(M, N, K, 1, BlkBitWidth, BlkLen, ComputeType, &params, Workspace.get(), tp.get());
   }
+
+  const auto scale_stride = ScaleType == ScaleFp16 ? 2 : 4;
+
+  state.counters["GB/s"] = benchmark::Counter(
+    uint64_t(state.iterations()) * (N * (K / 2 + K / BlkLen * scale_stride) + M * K * 4) / 1e09, benchmark::Counter::kIsRate);
 }
 
 template <size_t BlkBitWidth>
@@ -111,22 +117,23 @@ void SQNBITGEMM(benchmark::State& state) {
   const auto Symmetric = narrow<bool>(state.range(5));
   const bool HasBias = narrow<bool>(state.range(6));
   const auto ComputeType = static_cast<MLAS_SQNBIT_GEMM_COMPUTE_TYPE>(state.range(7));
-
-  RunSQNBitGemmBenchmark<BlkBitWidth>(BlkLen, M, N, K, Threads, Symmetric, HasBias, ComputeType, state);
+  const auto ScaleType = static_cast<MLAS_SQNBIT_GEMM_SCALE_TYPE>(state.range(8));
+  RunSQNBitGemmBenchmark<BlkBitWidth>(BlkLen, M, N, K, Threads, Symmetric, HasBias, ComputeType, ScaleType, state);
 }
 
 static void SQNBitGemmArgs(benchmark::internal::Benchmark* b) {
   b->ArgNames({"BlkLen", "M", "N", "K", "Threads", "Symmetric", "HasBias", "ComputeType"});
 
   b->ArgsProduct({
-      {128},                                   // BlkLen
-      {1},                                     // M
-      {4096, 11008},                           // N
-      {4096, 11008},                           // K
-      {1, 8},                                  // Threads
-      {int64_t{false}, int64_t{true}},         // Symmetric
-      {int64_t{false}, int64_t{true}},         // HasBias
-      {int64_t{CompFp32}, int64_t{CompInt8}},  // ComputeType
+      {64},                                     // BlkLen
+      {1},                                      // M
+      {4096, 11008},                            // N
+      {4096, 11008},                            // K
+      {4},                                      // Threads
+      {int64_t{true}},                          // Symmetric
+      {int64_t{false}},                         // HasBias
+      {int64_t{CompInt8}},                      // ComputeType
+      {int64_t{ScaleFp32}},                     // ScaleType
   });
 }
 
@@ -149,6 +156,7 @@ void SQNBITGEMM_ENV(benchmark::State& state) {
 
   RunSQNBitGemmBenchmark<BlkBitWidth>(BlkLen, M, N, K, Threads, Symmetric, HasBias,
                                       static_cast<MLAS_SQNBIT_GEMM_COMPUTE_TYPE>(ComputeType),
+                                      static_cast<MLAS_SQNBIT_GEMM_SCALE_TYPE>(ScaleFp32),
                                       state);
 
   std::ostringstream s;
