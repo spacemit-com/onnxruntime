@@ -123,7 +123,7 @@ void Tanh<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
   MlasComputeTanh(input + first, output_ptr, static_cast<size_t>(len));
 }
 
-#if defined(__riscv) && defined(__riscv_v_intrinsic)
+#if defined(MLAS_TARGET_RISCV64)
 template <>
 void Relu<float>::operator()(std::ptrdiff_t first, std::ptrdiff_t last) const {
   ptrdiff_t len = last - first;

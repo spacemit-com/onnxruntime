@@ -468,6 +468,32 @@ template <typename T>
 Status Add<T>::Compute(OpKernelContext* context) const {
   // BroadcastHelper received as argument may differ from 'helper' when parallelizing within a span
   ProcessBroadcastSpanFuncs funcs{
+#if defined(MLAS_TARGET_RISCV64)
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.ScalarInput0<T>();
+          auto rhs = per_iter_bh.SpanInput1<T>();
+          MlasAdd<float, true>(rhs.data(), &lhs, per_iter_bh.OutputSpan<T>().data(), rhs.size());
+        } else
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.ScalarInput0<T>() + per_iter_bh.EigenInput1<T>().array();
+      },
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.SpanInput0<T>();
+          auto rhs = per_iter_bh.ScalarInput1<T>();
+          MlasAdd<float, true>(lhs.data(), &rhs, per_iter_bh.OutputSpan<T>().data(), lhs.size());
+        } else
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>().array() + per_iter_bh.ScalarInput1<T>();
+      },
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.SpanInput0<T>();
+          auto rhs = per_iter_bh.SpanInput1<T>();
+          MlasAdd<float, false>(lhs.data(), rhs.data(), per_iter_bh.OutputSpan<T>().data(), lhs.size());
+        } else
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>() + per_iter_bh.EigenInput1<T>();
+      }};
+#else
       [](BroadcastHelper& per_iter_bh) {
         per_iter_bh.OutputEigen<T>() = per_iter_bh.ScalarInput0<T>() + per_iter_bh.EigenInput1<T>().array();
       },
@@ -477,7 +503,7 @@ Status Add<T>::Compute(OpKernelContext* context) const {
       [](BroadcastHelper& per_iter_bh) {
         per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>() + per_iter_bh.EigenInput1<T>();
       }};
-
+#endif
   UntypedBroadcastTwo(*context, funcs, 1.0f);
   return Status::OK();
 }
@@ -502,6 +528,32 @@ Status Sub<T>::Compute(OpKernelContext* context) const {
 template <typename T>
 Status Mul<T>::Compute(OpKernelContext* context) const {
   ProcessBroadcastSpanFuncs funcs{
+#if defined(MLAS_TARGET_RISCV64)
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.ScalarInput0<T>();
+          auto rhs = per_iter_bh.SpanInput1<T>();
+          MlasMul<float, true>(rhs.data(), &lhs, per_iter_bh.OutputSpan<T>().data(), rhs.size());
+        } else 
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.ScalarInput0<T>() * per_iter_bh.EigenInput1<T>().array();
+      },
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.SpanInput0<T>();
+          auto rhs = per_iter_bh.ScalarInput1<T>();
+          MlasMul<float, true>(lhs.data(), &rhs, per_iter_bh.OutputSpan<T>().data(), lhs.size());
+        } else 
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>().array() * per_iter_bh.ScalarInput1<T>();
+      },
+      [](BroadcastHelper& per_iter_bh) {
+        if constexpr (std::is_same<T, float>::value) {
+          auto lhs = per_iter_bh.SpanInput0<T>();
+          auto rhs = per_iter_bh.SpanInput1<T>();
+          MlasMul<float, false>(lhs.data(), rhs.data(), per_iter_bh.OutputSpan<T>().data(), lhs.size());
+        } else 
+          per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>().cwiseProduct(per_iter_bh.EigenInput1<T>());
+      }};
+#else
       [](BroadcastHelper& per_iter_bh) {
         per_iter_bh.OutputEigen<T>() = per_iter_bh.ScalarInput0<T>() * per_iter_bh.EigenInput1<T>().array();
       },
@@ -511,7 +563,7 @@ Status Mul<T>::Compute(OpKernelContext* context) const {
       [](BroadcastHelper& per_iter_bh) {
         per_iter_bh.OutputEigen<T>() = per_iter_bh.EigenInput0<T>().cwiseProduct(per_iter_bh.EigenInput1<T>());
       }};
-
+#endif
   UntypedBroadcastTwo(*context, funcs, 1.0);
   return Status::OK();
 }

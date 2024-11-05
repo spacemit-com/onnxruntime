@@ -1,7 +1,7 @@
 // Copyright (c) 2023 SpacemiT. All rights reserved.
 // Licensed under the MIT License.
 
-#include "../mlasi.h"
+#include "mlasi.h"
 
 MLAS_INTERNAL_DATA const struct {
     float ErfUpperAbsRange;

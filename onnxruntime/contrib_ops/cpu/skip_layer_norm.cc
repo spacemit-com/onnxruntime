@@ -267,6 +267,23 @@ Status SkipLayerNorm<T, simplified>::Compute(OpKernelContext* p_ctx) const {
   concurrency::ThreadPool::TryBatchParallelFor(
       p_ctx->GetOperatorThreadPool(), static_cast<int32_t>(task_count),
       [&](ptrdiff_t task_idx) {
+#if defined(MLAS_TARGET_RISCV64)
+        if constexpr (std::is_same<T, float>::value) {
+          if (skip_input_bias_add_output_data != nullptr) {
+            MlasSkipLayerNormalizationPerTask<float, simplified, true>(
+              input_data, skip_data, output_data, skip_input_bias_add_output_data,
+              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size
+            );
+            return Status::OK();
+          } else {
+            MlasSkipLayerNormalizationPerTask<float, simplified, false>(
+              input_data, skip_data, output_data, nullptr,
+              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size
+            );
+            return Status::OK();
+          }
+        }
+#endif
         ComputeJob(input_data, skip_data, gamma_data, beta_data, bias_data, skip_fp32_, gamma_fp32_, beta_fp32_,
                    bias_fp32_, task_idx, hidden_size, skip_size, epsilon_, simplified, output_data,
                    skip_input_bias_add_output_data, alloc);

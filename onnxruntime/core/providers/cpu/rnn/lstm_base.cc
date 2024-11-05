@@ -153,10 +153,27 @@ Status LSTMBase::ComputeImpl(OpKernelContext& context,
                                         initial_cell_2, activation_funcs_.Entries()[3], activation_funcs_.Entries()[4],
                                         activation_funcs_.Entries()[5], clip_, thread_pool);
 
-    fw.Compute(input, sequence_lens_span, num_directions_, W_1, R_1, output_1,
+    if constexpr (std::is_same<WeightT, uint8_t>::value || std::is_same<WeightT, int8_t>::value) {
+      concurrency::ThreadPool::TryBatchParallelFor(
+          thread_pool,
+          2,
+          [&](ptrdiff_t task_idx) {
+            if (task_idx == 0) {
+              fw.Compute(input, sequence_lens_span, num_directions_, W_1, R_1, output_1,
+                 hidden_output_1, last_cell_1);
+            } else {
+              bw.Compute(input, sequence_lens_span, num_directions_, W_2, R_2, output_2,
+                 hidden_output_2, last_cell_2);
+            }
+          },
+          0
+      );
+    } else {
+      fw.Compute(input, sequence_lens_span, num_directions_, W_1, R_1, output_1,
                hidden_output_1, last_cell_1);
-    bw.Compute(input, sequence_lens_span, num_directions_, W_2, R_2, output_2,
+      bw.Compute(input, sequence_lens_span, num_directions_, W_2, R_2, output_2,
                hidden_output_2, last_cell_2);
+    }
   } else {
     lstm::UniDirectionalLstm<InputT> fw(alloc, logger, seq_length, batch_size, input_size, hidden_size_, direction_,
                                         input_forget_, bias_1, peephole_weights_1, initial_hidden_1, initial_cell_1,

@@ -188,6 +188,13 @@ void RunTest(const TestOptions& opts,
   if constexpr (use_float16) {
     test.AddInput<T1>("scales", {static_cast<int64_t>(q_scale_size)}, ToFloat16(scales), true);
   } else {
+#if defined(MLAS_TARGET_RISCV64)
+    if (opts.accuracy_level == 4) {
+      for (auto& s : scales) {
+        s = (float)((__fp16)s);
+      }
+    }
+#endif
     test.AddInput<T1>("scales", {static_cast<int64_t>(q_scale_size)}, scales, true);
   }
 

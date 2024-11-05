@@ -1,7 +1,7 @@
 // Copyright (c) 2023 SpacemiT. All rights reserved.
 // Licensed under the MIT License.
 
-#include "../mlasi.h"
+#include "mlasi.h"
 
 void
 MlasCastF32ToF16Kernel_RVV(const float *in, unsigned short *out, size_t N)

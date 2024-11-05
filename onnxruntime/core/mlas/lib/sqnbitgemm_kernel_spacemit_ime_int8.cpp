@@ -20,7 +20,7 @@ namespace sqnbitgemm_spacemit_ime
 template <typename T>
 struct Q4_0X16 {
     T scale[16];
-    uint8_t zp[8];
+    // uint8_t zp[8];
     // blklen = 16
     // uint8_t[16][8]
     // b0 b8, b1 b9, b2 b10, b3 b11, b4 b12, b5 b13, b6 b14, b7 b15
@@ -192,7 +192,6 @@ QuantizeARow_CompInt8(size_t BlkLen, const float* A, size_t CountK, std::byte* Q
                 (int8_t)std::clamp(roundf(A[k] / scale_A), (float)std::numeric_limits<int8_t>::lowest(),
                                       (float)std::numeric_limits<int8_t>::max());
         }
-
         for (size_t k = CountK; k < BlkLen; k++) {
             QuantAData_offset[k] = 0;
         }
@@ -1433,7 +1432,7 @@ SQ4BitGemmM1Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
 
                     : [ CNT ] "+r"(cnt), [ NBLKS ] "+r"(nblks), [ BIAS ] "+r"(bias)
                     : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ C ] "r"(CPtr)
-                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6", "s7");
+                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6");
             } else {
                 __asm__ volatile(
                     "vsetvli      t0, zero, e32, m4       \n\t"
@@ -1524,7 +1523,7 @@ SQ4BitGemmM1Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
 
                     : [ CNT ] "+r"(cnt), [ NBLKS ] "+r"(nblks)
                     : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ C ] "r"(CPtr)
-                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6", "s7");
+                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6");
             }
         }
     }
@@ -1544,7 +1543,7 @@ SQ4BitGemmM1Kernel_CompInt8_Impl(size_t BlkLen,
 {
     MLAS_UNREFERENCED_PARAMETER(QuantBScale);
     MLAS_UNREFERENCED_PARAMETER(QuantBZeroPoint);
-    size_t INNER = BlkLen / 16;
+    const size_t INNER = BlkLen / 16;
     if constexpr (HasZeroPoint) {
         const uint8_t zp_index[32] = {
             0, 0, 0, 0, 0, 0, 0, 0,  //
@@ -1886,7 +1885,7 @@ SQ4BitGemmM1Kernel_CompInt8_Impl(size_t BlkLen,
 
                     : [ CNT ] "+r"(cnt), [ NBLKS ] "+r"(nblks), [ BIAS ] "+r"(bias)
                     : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ C ] "r"(CPtr)
-                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6", "s7");
+                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6");
             } else {
                 __asm__ volatile(
                     "vsetvli      t0, zero, e32, m4       \n\t"
@@ -1971,7 +1970,7 @@ SQ4BitGemmM1Kernel_CompInt8_Impl(size_t BlkLen,
 
                     : [ CNT ] "+r"(cnt), [ NBLKS ] "+r"(nblks)
                     : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ C ] "r"(CPtr)
-                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6", "s7");
+                    : "cc", "t0", "t5", "t3", "f1", "s1", "s2", "s3", "s4", "s5", "s6");
             }
         }
     }

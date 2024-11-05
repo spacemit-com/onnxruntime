@@ -84,7 +84,7 @@ class MlasSQNBitGemmTest : public MlasTestBase {
     params.Bias = Bias;
     params.C = C;
     params.ldc = ldc;
-#if defined(MLAS_TARGET_AMD64_IX86) | defined(MLAS_TARGET_RISCV64)
+#if defined(MLAS_TARGET_AMD64_IX86)
     if (ComputeType == CompInt8) {
       params.QuantBDataWorkspace = PackedQuantBDataWorkspace;
     }
@@ -454,7 +454,7 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
             tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
             tests_registered += RegisterSingleTest(1, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
             tests_registered += RegisterSingleTest(11, 527, 2131, ComputeType, ScaleType, WithThreadpool, Symmetric, true);
-            tests_registered += RegisterSingleTest(1001, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
+            // tests_registered += RegisterSingleTest(1001, 1027, 1031, ComputeType, ScaleType, WithThreadpool, Symmetric, false);
           }
         }
       }

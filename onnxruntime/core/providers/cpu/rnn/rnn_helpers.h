@@ -390,6 +390,85 @@ void gru_output_gate_tanh(float* ph, const float* pz, const float* ps, float* po
 void gru_output_gate_sigmoid(float* ph, const float* pz, const float* ps, float* po, int c, float alpha, float beta);
 void gru_output_gate_relu(const float* ph, const float* pz, const float* ps, float* po, int c, float alpha, float beta);
 
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+#include <riscv_vector.h>
+
+inline void elementwise_product(const float* op1, const float* op2, float* dest, int size) {
+  auto* op1_ptr = const_cast<float*>(op1);
+  auto* op2_ptr = const_cast<float*>(op2);
+  auto* dest_ptr = dest;
+  size_t gvl;
+  int length = size;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t lhs = __riscv_vle32_v_f32m4(op1_ptr, gvl);
+    vfloat32m4_t rhs = __riscv_vle32_v_f32m4(op2_ptr, gvl);
+    vfloat32m4_t dst = __riscv_vle32_v_f32m4(dest_ptr, gvl);
+    dst = __riscv_vfmacc_vv_f32m4(dst, lhs, rhs, gvl);
+    __riscv_vse32_v_f32m4(dest_ptr, dst, gvl);
+    op1_ptr += gvl;
+    op2_ptr += gvl;
+    dest_ptr += gvl;
+    length -= gvl;
+  }
+}
+
+inline void elementwise_sum1(const float* src, float* dest, int size) {
+  auto* op1_ptr = const_cast<float*>(src);
+  auto* dest_ptr = dest;
+  size_t gvl;
+  int length = size;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t lhs = __riscv_vle32_v_f32m4(op1_ptr, gvl);
+    vfloat32m4_t dst = __riscv_vle32_v_f32m4(dest_ptr, gvl);
+    dst = __riscv_vfadd_vv_f32m4(dst, lhs, gvl);
+    __riscv_vse32_v_f32m4(dest_ptr, dst, gvl);
+    op1_ptr += gvl;
+    dest_ptr += gvl;
+    length -= gvl;
+  }
+}
+
+inline void elementwise_mul1(const float* src, float* dest, int size) {
+  auto* src_ptr = const_cast<float*>(src);
+  auto* pd_ptr = dest;
+  size_t gvl;
+  int length = size;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t psrc_v = __riscv_vle32_v_f32m4(src_ptr, gvl);
+    vfloat32m4_t pd_v = __riscv_vle32_v_f32m4(pd_ptr, gvl);
+    pd_v = __riscv_vfmul_vv_f32m4(psrc_v, pd_v, gvl);
+    __riscv_vse32_v_f32m4(pd_ptr, pd_v, gvl);
+    src_ptr += gvl;
+    pd_ptr += gvl;
+    length -= gvl;
+  }
+}
+
+inline void elementwise_sum2(const float* src1, const float* src2, float* dest, int size) {
+  auto* op1_ptr = const_cast<float*>(src1);
+  auto* op2_ptr = const_cast<float*>(src2);
+  auto* dest_ptr = dest;
+  size_t gvl;
+  int length = size;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t lhs = __riscv_vle32_v_f32m4(op1_ptr, gvl);
+    vfloat32m4_t rhs = __riscv_vle32_v_f32m4(op2_ptr, gvl);
+    vfloat32m4_t dst = __riscv_vle32_v_f32m4(dest_ptr, gvl);
+    dst = __riscv_vfadd_vv_f32m4(dst, lhs, gvl);
+    dst = __riscv_vfadd_vv_f32m4(dst, rhs, gvl);
+    __riscv_vse32_v_f32m4(dest_ptr, dst, gvl);
+    op1_ptr += gvl;
+    op2_ptr += gvl;
+    dest_ptr += gvl;
+    length -= gvl;
+  }
+}
+
+#else
 inline void elementwise_product(const float* op1, const float* op2, float* dest, int size) {
   for (int i = 0; i < size; i++)
     dest[i] += op1[i] * op2[i];
@@ -400,10 +479,16 @@ inline void elementwise_sum1(const float* src, float* dest, int size) {
     dest[i] += src[i];
 }
 
+inline void elementwise_mul1(const float* src, float* dest, int size) {
+  for (int i = 0; i < size; i++)
+    dest[i] *= src[i];
+}
+
 inline void elementwise_sum2(const float* src1, const float* src2, float* dest, int size) {
   for (int i = 0; i < size; i++)
     dest[i] += src1[i] + src2[i];
 }
+#endif
 
 }  // namespace deepcpu
 }  // namespace detail

@@ -63,8 +63,8 @@ Main loop processes 8x32 tile, depth 2.
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../halfgemm.h"
-#include "../mlasi.h"
+#include "halfgemm.h"
+#include "mlasi.h"
 
 extern "C" {
 size_t

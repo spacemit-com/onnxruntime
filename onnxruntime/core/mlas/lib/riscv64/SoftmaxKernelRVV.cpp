@@ -1,7 +1,7 @@
 // Copyright (c) 2023 SpacemiT. All rights reserved.
 // Licensed under the MIT License.
 
-#include "../mlasi.h"
+#include "mlasi.h"
 
 float
 MlasReduceMaximumF32Kernel_RVV(const float* Input, const size_t D)

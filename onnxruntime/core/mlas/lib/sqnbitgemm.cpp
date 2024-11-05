@@ -191,11 +191,13 @@ MlasSQNBitGemmPackQuantBDataSize(
     }
 
     if (BlkBitWidth == 4 && Dispatch->SQ4BitGemmPackQuantBDataSizeWithScale != nullptr) {
+        if (ScaleType == MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp16) {
+            assert(ComputeType == MLAS_SQNBIT_GEMM_COMPUTE_TYPE::CompInt8);
+        }
         return Dispatch->SQ4BitGemmPackQuantBDataSizeWithScale(
             N, K, BlkLen, ComputeType, ScaleType
         );
-    } else if (BlkBitWidth == 4 && Dispatch->SQ4BitGemmPackQuantBDataSize != nullptr && 
-        ScaleType == MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp32) {
+    } else if (BlkBitWidth == 4 && Dispatch->SQ4BitGemmPackQuantBDataSize != nullptr) {
         return Dispatch->SQ4BitGemmPackQuantBDataSize(
             N, K, BlkLen, ComputeType
         );

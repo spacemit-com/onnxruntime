@@ -275,9 +275,30 @@ void ComputeGemm(const int M,
   uint8_t b_zero_point = weights.quant_para_->zero_point ? *static_cast<const uint8_t*>(weights.quant_para_->zero_point) : 0;
 
   std::vector<float> scale_multiplier(weights.quant_para_->scale_size);
+
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+  auto* scale_ptr = const_cast<float*>(weights.quant_para_->scale);
+  auto* dest_ptr = scale_multiplier.data();
+  size_t length = weights.quant_para_->scale_size;
+  __asm__ volatile(
+      "LOOP%=:                                  \t\n"
+      "vsetvli  t0,       %[n],     e32,      m4\t\n"
+      "sub      %[n],     %[n],     t0          \t\n"
+      "slli     t0,       t0,       2           \t\n"
+      "vle32.v  v0,       (%[x])                \t\n"
+      "add      %[x],     %[x],     t0          \t\n"
+      "vfmul.vf v0,       v0,       %[a_scale] \t\n"
+      "vse32.v  v0,      (%[y])                \t\n"
+      "add      %[y],     %[y],     t0          \t\n"
+      "bnez     %[n],     LOOP%=                \t\n"
+      : [ n ] "+r"(length), [ x ] "+r"(scale_ptr), [ y ] "+r"(dest_ptr)
+      : [ a_scale ] "f"(a_scale)
+      : "cc", "t0");
+#else
   for (size_t s = 0; s < weights.quant_para_->scale_size; s++) {
     scale_multiplier[s] = a_scale * (weights.quant_para_->scale[s]);
   }
+#endif
 
   size_t ld_C_buffer = ldc;
   int32_t* C_buffer = reinterpret_cast<int32_t*>(C);
@@ -393,34 +414,63 @@ void add_bias_into(const float* ps, float* pd, int c) {
 void clip(const float b, float* pd, int c) {
   for (int i = 0; i < c; i++) {
     float x = pd[i];
-    if (x > b)
-      pd[i] = b;
-    else if (x < -b)
-      pd[i] = -b;
+    x = std::min(b, x);
+    x = std::max(-b, x);
+    pd[i] = x;
   }
 }
 
 void clip_ignore_bias(const float b, const float* pb, float* pd, int c) {
   ORT_UNUSED_PARAMETER(pb);
-
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+  auto* pd_ptr = pd;
+  size_t gvl;
+  int length = c;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t d_v = __riscv_vle32_v_f32m4(pd_ptr, gvl);
+    d_v = __riscv_vfmax_vf_f32m4(d_v, -b, gvl);
+    d_v = __riscv_vfmin_vf_f32m4(d_v, b, gvl);
+    __riscv_vse32_v_f32m4(pd_ptr, d_v, gvl);
+    pd_ptr += gvl;
+    length -= gvl;
+  }
+#else
   for (int i = 0; i < c; i++) {
     float x = pd[i];
-    if (x > b)
-      pd[i] = b;
-    else if (x < -b)
-      pd[i] = -b;
-    else
-      pd[i] = x;
+    x = std::min(b, x);
+    x = std::max(-b, x);
+    pd[i] = x;
   }
+#endif
 }
 
 void clip_add_bias(const float b, const float* restrict pb, float* restrict pd, int c) {
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+  auto* pb_ptr = const_cast<float*>(pb);
+  auto* pd_ptr = pd;
+  size_t gvl;
+  int length = c;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t b_v = __riscv_vle32_v_f32m4(pb_ptr, gvl);
+    vfloat32m4_t d_v = __riscv_vle32_v_f32m4(pd_ptr, gvl);
+    d_v = __riscv_vfadd_vv_f32m4(d_v, b_v, gvl);
+    d_v = __riscv_vfmax_vf_f32m4(d_v, -b, gvl);
+    d_v = __riscv_vfmin_vf_f32m4(d_v, b, gvl);
+    __riscv_vse32_v_f32m4(pd_ptr, d_v, gvl);
+    pb_ptr += gvl;
+    pd_ptr += gvl;
+    length -= gvl;
+  }
+#else
   for (int i = 0; i < c; i++) {
     float x = pd[i] + pb[i];
     x = std::min(b, x);
     x = std::max(-b, x);
     pd[i] = x;
   }
+#endif
 }
 
 void sigmoid_m(const float* restrict ps1, float* restrict ps1_c, const float* restrict ps2, float* restrict pd, int c,
@@ -430,9 +480,7 @@ void sigmoid_m(const float* restrict ps1, float* restrict ps1_c, const float* re
   ORT_UNUSED_PARAMETER(ps1_c);
 
   MlasComputeLogistic(ps1, pd, c);
-  for (int i = 0; i < c; i++) {
-    pd[i] *= ps2[i];
-  }
+  elementwise_mul1(ps2, pd, c);
 }
 
 void tanh_m(const float* restrict ps1, float* restrict ps1_c, const float* restrict ps2, float* restrict pd, int c,
@@ -442,9 +490,7 @@ void tanh_m(const float* restrict ps1, float* restrict ps1_c, const float* restr
   ORT_UNUSED_PARAMETER(ps1_c);
 
   MlasComputeTanh(ps1, pd, c);
-  for (int i = 0; i < c; i++) {
-    pd[i] *= ps2[i];
-  }
+  elementwise_mul1(ps2, pd, c);
 }
 
 void relu_m(const float* restrict ps1, float* restrict ps1_c, const float* restrict ps2, float* restrict pd, int c,
@@ -537,9 +583,34 @@ void tanh_exact(float* pd, int c, float alpha, float beta) {
 // Yet this in_place() follow the restrict semantic better.
 static void merge_lstm_gates_to_memory_in_place(const float* restrict pi, const float* restrict pf,
                                                 const float* restrict pg, float* restrict pcurr, int c) {
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+  auto* pi_ptr = const_cast<float*>(pi);
+  auto* pf_ptr = const_cast<float*>(pf);
+  auto* pg_ptr = const_cast<float*>(pg);
+  auto* pcurr_ptr = pcurr;
+  size_t gvl;
+  int length = c;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t i_v = __riscv_vle32_v_f32m4(pi_ptr, gvl);
+    vfloat32m4_t g_v = __riscv_vle32_v_f32m4(pg_ptr, gvl);
+    i_v = __riscv_vfmul_vv_f32m4(i_v, g_v, gvl);
+    vfloat32m4_t curr_v = __riscv_vle32_v_f32m4(pcurr_ptr, gvl);
+    vfloat32m4_t f_v = __riscv_vle32_v_f32m4(pf_ptr, gvl);
+    f_v = __riscv_vfmul_vv_f32m4(f_v, curr_v, gvl);
+    curr_v = __riscv_vfadd_vv_f32m4(f_v, i_v, gvl);
+    __riscv_vse32_v_f32m4(pcurr_ptr, curr_v, gvl);
+    pi_ptr += gvl;
+    pf_ptr += gvl;
+    pg_ptr += gvl;
+    pcurr_ptr += gvl;
+    length -= gvl;
+  }
+#else
   for (int i = 0; i < c; i++) {
     pcurr[i] = pcurr[i] * pf[i] + pi[i] * pg[i];
   }
+#endif
 }
 
 void merge_lstm_gates_to_memory(const float* pprev, const float* restrict pi, const float* restrict pf,
@@ -548,10 +619,37 @@ void merge_lstm_gates_to_memory(const float* pprev, const float* restrict pi, co
     merge_lstm_gates_to_memory_in_place(pi, pf, pg, pcurr, c);
     return;
   }
+#if defined(__riscv) && defined(__riscv_v_intrinsic)
+  auto* pprev_ptr = const_cast<float*>(pprev);
+  auto* pi_ptr = const_cast<float*>(pi);
+  auto* pf_ptr = const_cast<float*>(pf);
+  auto* pg_ptr = const_cast<float*>(pg);
+  auto* pcurr_ptr = pcurr;
+  size_t gvl;
+  int length = c;
+  while (length > 0) {
+    gvl = __riscv_vsetvl_e32m4(length);
+    vfloat32m4_t i_v = __riscv_vle32_v_f32m4(pi_ptr, gvl);
+    vfloat32m4_t g_v = __riscv_vle32_v_f32m4(pg_ptr, gvl);
+    i_v = __riscv_vfmul_vv_f32m4(i_v, g_v, gvl);
+    vfloat32m4_t prev_v = __riscv_vle32_v_f32m4(pprev_ptr, gvl);
+    vfloat32m4_t f_v = __riscv_vle32_v_f32m4(pf_ptr, gvl);
+    prev_v = __riscv_vfmul_vv_f32m4(f_v, prev_v, gvl);
+    vfloat32m4_t curr_v = __riscv_vfadd_vv_f32m4(prev_v, i_v, gvl);
+    __riscv_vse32_v_f32m4(pcurr_ptr, curr_v, gvl);
 
+    pprev_ptr += gvl;
+    pi_ptr += gvl;
+    pf_ptr += gvl;
+    pg_ptr += gvl;
+    pcurr_ptr += gvl;
+    length -= gvl;
+  }
+#else
   for (int i = 0; i < c; i++) {
     pcurr[i] = pprev[i] * pf[i] + pi[i] * pg[i];
   }
+#endif
 }
 
 void gru_reset_gate_tanh(const float* ps1, float* ps2, float* pd, int c, float alpha, float beta) {

@@ -1896,3 +1896,40 @@ MlasFlashAttention(
     MlasFlashAttentionThreadedArgs* args,
     MLAS_THREADPOOL* ThreadPool
 );
+
+
+template<typename T, bool IsScalarB>
+void
+MLASCALL
+MlasAdd(
+    const T* A,
+    const T* B,
+    T* C,
+    size_t count
+);
+
+template<typename T, bool IsScalarB>
+void
+MLASCALL
+MlasMul(
+    const T* A,
+    const T* B,
+    T* C,
+    size_t count
+);
+
+template <typename T, bool simplified, bool has_skip_output>
+void MLASCALL
+MlasSkipLayerNormalizationPerTask(
+    const T* input,
+    const T* skip_input,
+    T* output,
+    T* skip_output,
+    const T* gamma_data,
+    const T* beta_data,
+    const T* bias_data,
+    int64_t hidden_size,
+    ptrdiff_t task_idx,
+    float epsilon,
+    size_t skip_size
+);

@@ -88,7 +88,7 @@ Status Clip_6<T>::Compute(OpKernelContext* ctx) const {
         const int64_t start = task_idx * length_per_task;
         const size_t count = narrow<size_t>(std::min(length_per_task, elem_count - start));
 
-#if defined(__riscv) && defined(__riscv_v_intrinsic)
+#if defined(MLAS_TARGET_RISCV64)
         if constexpr (std::is_same<T, float>::value) {
           struct MLAS_ACTIVATION activation;
           activation.ActivationKind = MLAS_ACTIVATION_KIND::MlasClipActivation;
@@ -139,7 +139,7 @@ struct Clip::ComputeImpl {
           const int64_t start = task_idx * length_per_task;
           const size_t count = narrow<size_t>(std::min(length_per_task, elem_count - start));
 
-#if defined(__riscv) && defined(__riscv_v_intrinsic)
+#if defined(MLAS_TARGET_RISCV64)
           if constexpr (std::is_same<T, float>::value) {
             struct MLAS_ACTIVATION activation;
             activation.ActivationKind = MLAS_ACTIVATION_KIND::MlasClipActivation;
