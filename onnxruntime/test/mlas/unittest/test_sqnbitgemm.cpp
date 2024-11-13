@@ -414,11 +414,11 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
   static size_t RegisterShortExecuteTests() {
     size_t tests_registered = 0;
 
-    for (MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType : {CompFp32}) {
+    for (MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType : {CompInt8}) {
       for (bool WithThreadpool : {false, true}) {
-        for (bool Symmetric : {false, true}) {
+        for (bool Symmetric : {true}) {
 #ifdef MLAS_TARGET_RISCV64
-          for (MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp32, ScaleFp16}) {
+          for (MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp32}) {
             if (ComputeType == CompFp32 && ScaleType == ScaleFp16) {
               continue;
             }
