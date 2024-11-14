@@ -11,7 +11,7 @@
 
 #include "mlas_qnbit.h"
 #include "mlasi.h"
-#include "sqnbitgemm.h"
+#include "qnbitgemm.h"
 
 namespace sqnbitgemm_spacemit_ime
 {
@@ -19,14 +19,14 @@ size_t
 SQ4BitGemmPackQuantBDataSize(size_t N,
                              size_t K,
                              size_t BlkLen,
-                             MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
-                             MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType);
+                             MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                             MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType);
 
 void
 SQ4BitGemmPackQuantBData(size_t N,
                          size_t K,
                          size_t BlkLen,
-                         MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                         MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
                          const std::byte* QuantBDataBegin,
                          std::byte* PackedQuantBDataBegin,
                          MLAS_THREADPOOL* ThreadPool);
@@ -35,13 +35,13 @@ void
 SQ4BitGemmPackQuantBDataAndBlkSum(size_t N,
                                   size_t K,
                                   size_t BlkLen,
-                                  MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
-                                  MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
+                                  MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                                  MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType,
                                   const std::byte* QuantBDataBegin,
                                   const float* QuantBScaleBegin,
                                   bool has_zp_input,
                                   const std::byte* QuantBZeroPointBegin,
-                                  PackedQuantBDataStruct& packed_quant_b,
+                                  PackedQuantBDataStruct<float>& packed_quant_b,
                                   MLAS_THREADPOOL* ThreadPool);
 
 size_t
@@ -63,7 +63,7 @@ void
 QuantizeARow_CompInt8(size_t BlkLen, const float* A, size_t CountK, std::byte* QuantA);
 
 void
-Q4BitBlkDequantBForSgemm_CompFp32(size_t BlkLen,
+SQ4BitBlkDequantBForSgemm_CompFp32(size_t BlkLen,
                                   float* FpData,
                                   const std::byte* QuantBData,
                                   const float* QuantBScale,

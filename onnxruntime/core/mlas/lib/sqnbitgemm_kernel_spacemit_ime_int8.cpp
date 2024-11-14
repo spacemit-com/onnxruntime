@@ -8,7 +8,7 @@
 #include <cassert>
 #include <utility>
 
-#include "sqnbitgemm.h"
+#include "qnbitgemm.h"
 #include "sqnbitgemm_kernel_spacemit_ime.h"
 #include "sqnbitgemm_q8_block.h"
 //
@@ -36,13 +36,13 @@ void
 SQ4BitGemmPackQuantBDataAndBlkSumImpl(size_t N,
                                       size_t K,
                                       size_t BlkLen,
-                                      MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
-                                      MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
+                                      MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                                      MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType,
                                       const std::byte* QuantBDataBegin,
                                       const T* QuantBScaleBegin,
                                       bool has_zp_input,
                                       const std::byte* QuantBZeroPointBegin,
-                                      PackedQuantBDataStruct& packed_quant_b,
+                                      PackedQuantBDataStruct<float>& packed_quant_b,
                                       MLAS_THREADPOOL* ThreadPool)
 {
     MLAS_UNREFERENCED_PARAMETER(ComputeType);
@@ -143,23 +143,23 @@ void
 SQ4BitGemmPackQuantBDataAndBlkSum(size_t N,
                                   size_t K,
                                   size_t BlkLen,
-                                  MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
-                                  MLAS_SQNBIT_GEMM_SCALE_TYPE ScaleType,
+                                  MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                                  MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType,
                                   const std::byte* QuantBDataBegin,
                                   const float* QuantBScaleBegin,
                                   bool has_zp_input,
                                   const std::byte* QuantBZeroPointBegin,
-                                  PackedQuantBDataStruct& packed_quant_b,
+                                  PackedQuantBDataStruct<float>& packed_quant_b,
                                   MLAS_THREADPOOL* ThreadPool)
 {
     assert(BlkLen >= 16 && BlkLen % 16 == 0);
-    assert(ComputeType == MLAS_SQNBIT_GEMM_COMPUTE_TYPE::CompInt8);
-    if (ScaleType == MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp32) {
+    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::CompInt8);
+    if (ScaleType == MLAS_QNBIT_GEMM_SCALE_TYPE::ScaleFp32) {
         SQ4BitGemmPackQuantBDataAndBlkSumImpl<float>(N, K, BlkLen, ComputeType, ScaleType, QuantBDataBegin,
                                                      QuantBScaleBegin, has_zp_input, QuantBZeroPointBegin,
                                                      packed_quant_b, ThreadPool);
 
-    } else if (ScaleType == MLAS_SQNBIT_GEMM_SCALE_TYPE::ScaleFp16) {
+    } else if (ScaleType == MLAS_QNBIT_GEMM_SCALE_TYPE::ScaleFp16) {
         SQ4BitGemmPackQuantBDataAndBlkSumImpl<__fp16>(N, K, BlkLen, ComputeType, ScaleType, QuantBDataBegin,
                                                       (const __fp16*)QuantBScaleBegin, has_zp_input,
                                                       QuantBZeroPointBegin, packed_quant_b, ThreadPool);
@@ -185,12 +185,12 @@ QuantizeARow_CompInt8(size_t BlkLen, const float* A, size_t CountK, std::byte* Q
 
         ((float*)QuantA)[0] = scale_A;
 
-        auto* QuantAData_offset = (int8_t *)(QuantA + sizeof(float));
+        auto* QuantAData_offset = (int8_t*)(QuantA + sizeof(float));
 
         for (size_t k = 0; k < CountK; k++) {
             QuantAData_offset[k] =
                 (int8_t)std::clamp(roundf(A[k] / scale_A), (float)std::numeric_limits<int8_t>::lowest(),
-                                      (float)std::numeric_limits<int8_t>::max());
+                                   (float)std::numeric_limits<int8_t>::max());
         }
         for (size_t k = CountK; k < BlkLen; k++) {
             QuantAData_offset[k] = 0;
@@ -1079,29 +1079,27 @@ namespace
     "addi         a4, a4, 8               \n\t" \
     "vle32.v       v11, (a4), v0.t        \n\t" \
     "addi         a4, a4, 8               \n\t" \
-    \
+                                                \
     "li            t1, 0x30               \n\t" \
     "vmv.s.x      v0, t1                  \n\t" \
     "vle32.v       v10, (a3), v0.t        \n\t" \
     "addi         a3, a3, 8               \n\t" \
     "vle32.v       v11, (a3), v0.t        \n\t" \
     "addi         a3, a3, 8               \n\t" \
-    \
+                                                \
     "li            t1, 0x0c               \n\t" \
     "vmv.s.x      v0, t1                  \n\t" \
     "vle32.v       v10, (a2), v0.t        \n\t" \
     "addi         a2, a2, 8               \n\t" \
     "vle32.v       v11, (a2), v0.t        \n\t" \
     "addi         a2, a2, 8               \n\t" \
-    \
+                                                \
     "li            t1, 0x03               \n\t" \
     "vmv.s.x      v0, t1                  \n\t" \
     "vle32.v       v10, (a1), v0.t        \n\t" \
     "addi         a1, a1, 8               \n\t" \
     "vle32.v       v11, (a1), v0.t        \n\t" \
-    "addi         a1, a1, 8               \n\t" \
-    \
-
+    "addi         a1, a1, 8               \n\t"
 
 #define LOAD_B_16x8x2                           \
     "vsetvli      t0, zero, e8, m1        \n\t" \
@@ -1113,16 +1111,16 @@ namespace
     "addi         s3, s3, 32*4            \n\t" \
     "vle8.v       v9, (s4)                \n\t" \
     "addi         s4, s4, 32*4            \n\t" \
-    \
+                                                \
     "vand.vi      v2, v6, 15              \n\t" \
     "vand.vi      v3, v7, 15              \n\t" \
     "vand.vi      v4, v8, 15              \n\t" \
     "vand.vi      v5, v9, 15              \n\t" \
-    \
+                                                \
     "vsrl.vi      v6, v6, 4               \n\t" \
     "vsrl.vi      v7, v7, 4               \n\t" \
     "vsrl.vi      v8, v8, 4               \n\t" \
-    "vsrl.vi      v9, v9, 4               \n\t" \
+    "vsrl.vi      v9, v9, 4               \n\t"
 
 // [s2|s5, s3, s4, s6]
 #define LOAD_SCALE_4x16_FP16                    \
@@ -1170,7 +1168,7 @@ namespace
     "vfmul.vf     v9, v9, f4, v0.t        \n\t" \
     "vfmul.vf     v11, v11, f4, v0.t      \n\t" \
     "vfmul.vf     v13, v13, f4, v0.t      \n\t" \
-    "vfmul.vf     v15, v15, f4, v0.t      \n\t" \
+    "vfmul.vf     v15, v15, f4, v0.t      \n\t"
 
 // [s2|s5, s3, s4, s6]
 #define LOAD_SCALE_4x16                         \
@@ -1211,7 +1209,7 @@ namespace
     "vfmul.vf     v9, v9, f4, v0.t        \n\t" \
     "vfmul.vf     v11, v11, f4, v0.t      \n\t" \
     "vfmul.vf     v13, v13, f4, v0.t      \n\t" \
-    "vfmul.vf     v15, v15, f4, v0.t      \n\t" \
+    "vfmul.vf     v15, v15, f4, v0.t      \n\t"
 
 //[s1| BIAS, s2, s3, s4]
 #define LOAD_BIAS                               \
@@ -1222,7 +1220,7 @@ namespace
     "addi         s2, %[BIAS], 16         \n\t" \
     "addi         s3, %[BIAS], 32         \n\t" \
     "addi         s4, %[BIAS], 48         \n\t" \
-    \
+                                                \
     "vle32.v      v24, (%[BIAS])          \n\t" \
     "vle32.v      v26, (s2)               \n\t" \
     "vle32.v      v28, (s3)               \n\t" \
@@ -1235,8 +1233,7 @@ namespace
     "vmv.v.v      v25, v24                \n\t" \
     "vmv.v.v      v27, v26                \n\t" \
     "vmv.v.v      v29, v28                \n\t" \
-    "vmv.v.v      v31, v30                \n\t" \
-
+    "vmv.v.v      v31, v30                \n\t"
 
 #define SQ4BIT_KERNEL_COMP_4x16x16              \
     "vmadot       v16, v10, v2            \n\t" \
@@ -1248,7 +1245,6 @@ namespace
     "vmadot       v20, v11, v8            \n\t" \
     "vmadot       v22, v11, v9            \n\t"
 
-
 #define SAVE_RESULT_4x16                        \
     "addi         a1, %[C], 0             \n\t" \
     "add         a2, %[C], %[LDC]         \n\t" \
@@ -1259,43 +1255,43 @@ namespace
     "li           t1, 0xf0                \n\t" \
     "vmv.s.x      v0, t1                  \n\t" \
     "vsetvli      t0, zero, e32, mf2      \n\t" \
-    \
+                                                \
     "vse32.v      v24, (a1)               \n\t" \
     "addi         a1, a1, 16              \n\t" \
     "vse32.v      v25, (a3)               \n\t" \
     "addi         a3, a3, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v26, (a1)               \n\t" \
     "addi         a1, a1, 16              \n\t" \
     "vse32.v      v27, (a3)               \n\t" \
     "addi         a3, a3, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v28, (a1)               \n\t" \
     "addi         a1, a1, 16              \n\t" \
     "vse32.v      v29, (a3)               \n\t" \
     "addi         a3, a3, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v30, (a1)               \n\t" \
     "vse32.v      v31, (a3)               \n\t" \
     "vsetvli      t0, zero, e32, m1       \n\t" \
-    \
+                                                \
     "vse32.v      v24, (a2), v0.t         \n\t" \
     "addi         a2, a2, 16              \n\t" \
     "vse32.v      v25, (a4), v0.t         \n\t" \
     "addi         a4, a4, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v26, (a2), v0.t         \n\t" \
     "addi         a2, a2, 16              \n\t" \
     "vse32.v      v27, (a4), v0.t         \n\t" \
     "addi         a4, a4, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v28, (a2), v0.t         \n\t" \
     "addi         a2, a2, 16              \n\t" \
     "vse32.v      v29, (a4), v0.t         \n\t" \
     "addi         a4, a4, 16              \n\t" \
-    \
+                                                \
     "vse32.v      v30, (a2), v0.t         \n\t" \
-    "vse32.v      v31, (a4), v0.t         \n\t" \
+    "vse32.v      v31, (a4), v0.t         \n\t"
 
 #define SQ4BIT_KERNEL_LOAD_ZP_16X1_v2           \
     "vsetvli      t0, zero, e8, mf4       \n\t" \
@@ -1308,7 +1304,7 @@ namespace
     "vrgather.vv  v14, v11, v1            \n\t" \
     "vrgather.vv  v13, v10, v2            \n\t" \
     "vadd.vi      v2, v1, 4               \n\t" \
-    "vrgather.vv  v15, v11, v2            \n\t" \
+    "vrgather.vv  v15, v11, v2            \n\t"
 
 template <bool HasZeroPoint>
 void
@@ -1342,330 +1338,336 @@ SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
             std::byte* QuantBDataPtr = (std::byte*)QuantBData +                 //
                                        n * BlockCountK * BlkLen / 2 +           // b data
                                        n * BlockCountK * sizeof(uint8_t) / 2 +  // zp
-                                       n * BlockCountK * sizeof(__fp16);         // scale
+                                       n * BlockCountK * sizeof(__fp16);        // scale
             float* CPtr = C + n;
             if (NBLKS < 16) {
-              CPtr = tmp;
-              LDC = 16 * sizeof(float);
+                CPtr = tmp;
+                LDC = 16 * sizeof(float);
             }
             if (Bias != nullptr) {
-              const float* bias = Bias + n;
-              if (NBLKS < 16) {
-                __asm__ volatile(
-                  "vsetvli        t0, %[N], e32, m2     \n\t"
-                  "vle32.v        v0, (%[SRC])          \n\t"
-                  "vse32.v        v0, (%[DST])          \n\t"
-                  :
-                  : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
-                  : "cc", "t0");
-                bias = tmp;
-              }
-              __asm__ volatile(
-                LOAD_BIAS
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "vsetvli            t0, zero, e8, m1            \n\t"
-                "vle8.v             v1, (%[ZPI])                \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                const float* bias = Bias + n;
+                if (NBLKS < 16) {
+                    __asm__ volatile(
+                        "vsetvli        t0, %[N], e32, m2     \n\t"
+                        "vle32.v        v0, (%[SRC])          \n\t"
+                        "vse32.v        v0, (%[DST])          \n\t"
+                        :
+                        : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
+                        : "cc", "t0");
+                    bias = tmp;
+                }
+                __asm__ volatile(LOAD_BIAS
+                                 "addi               t3, %[BlockCountK], 0       \n\t"
+                                 "vsetvli            t0, zero, e8, m1            \n\t"
+                                 "vle8.v             v1, (%[ZPI])                \n\t"
+                                 "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                // scale offset
-                "addi               s5, s1, 0                   \n\t"
-                // zp offset
-                "addi               s6, s1, 32                  \n\t"
-                "addi               s1, s6, 8                   \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                                 "addi               s1, %[B], 0                 \n\t"
+                                 "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                                 // scale offset
+                                 "addi               s5, s1, 0                   \n\t"
+                                 // zp offset
+                                 "addi               s6, s1, 32                  \n\t"
+                                 "addi               s1, s6, 8                   \n\t"
+                                 "addi               s2, s1, 32                  \n\t"
+                                 "addi               s3, s1, 32*2                \n\t"
+                                 "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vsub.vv            v2, v2, v12                 \n\t"
-                "vsub.vv            v6, v6, v12                 \n\t"
-                "vsub.vv            v3, v3, v13                 \n\t"
-                "vsub.vv            v7, v7, v13                 \n\t"
-                "vsub.vv            v4, v4, v14                 \n\t"
-                "vsub.vv            v8, v8, v14                 \n\t"
-                "vsub.vv            v5, v5, v15                 \n\t"
-                "vsub.vv            v9, v9, v15                 \n\t"
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16_FP16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                                 "add                a2, a1, %[LDA]              \n\t"
+                                 "add                a3, a2, %[LDA]              \n\t"
+                                 "add                a4, a3, %[LDA]              \n\t"
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vxor.vv            v16, v16, v16               \n\t"
+                                 // load a scale
+                                 "flw                f1, (a1)                    \n\t"
+                                 "addi               a1, a1, 4                   \n\t"
+                                 "flw                f2, (a2)                    \n\t"
+                                 "addi               a2, a2, -4                  \n\t"
+                                 "flw                f3, (a3)                    \n\t"
+                                 "addi               a3, a3, -12                 \n\t"
+                                 "flw                f4, (a4)                    \n\t"
+                                 "addi               a4, a4, -20                 \n\t"
+                                 "addi               t2, %[INNER], 0             \n\t"
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                                 SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
+
+                                 "BLOCK_INNER_LOOP%=:                            \n\t"
+
+                                 LOAD_A_4x8x2 LOAD_B_16x8x2
+
+                                 "vsub.vv            v2, v2, v12                 \n\t"
+                                 "vsub.vv            v6, v6, v12                 \n\t"
+                                 "vsub.vv            v3, v3, v13                 \n\t"
+                                 "vsub.vv            v7, v7, v13                 \n\t"
+                                 "vsub.vv            v4, v4, v14                 \n\t"
+                                 "vsub.vv            v8, v8, v14                 \n\t"
+                                 "vsub.vv            v5, v5, v15                 \n\t"
+                                 "vsub.vv            v9, v9, v15                 \n\t"
+
+                                 SQ4BIT_KERNEL_COMP_4x16x16
+
+                                 "addi               t2, t2, -1                  \n\t"
+                                 "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                                 LOAD_SCALE_4x16_FP16
+
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vfcvt.f.x.v        v16, v16                    \n\t"
+                                 "vfmacc.vv          v24, v16, v8                \n\t"
+                                 "addi               t3, t3, -1                  \n\t"
+                                 "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                                 "RESULT_SAVE%=:                                 \n\t"
+
+                                 SAVE_RESULT_4x16
+                                 :
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
+                                   [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
+                                 : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
+                                   "s2", "s3", "s4", "s5", "s6");
 
             } else {
-              __asm__ volatile(
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v24, v24, v24               \n\t"
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "vsetvli            t0, zero, e8, m1            \n\t"
-                "vle8.v             v1, (%[ZPI])                \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                __asm__ volatile(
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v24, v24, v24               \n\t"
+                    "addi               t3, %[BlockCountK], 0       \n\t"
+                    "vsetvli            t0, zero, e8, m1            \n\t"
+                    "vle8.v             v1, (%[ZPI])                \n\t"
+                    "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                // scale offset
-                "addi               s5, s1, 0                   \n\t"
-                // zp offset
-                "addi               s6, s1, 32                  \n\t"
-                "addi               s1, s6, 8                   \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                    "addi               s1, %[B], 0                 \n\t"
+                    "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                    // scale offset
+                    "addi               s5, s1, 0                   \n\t"
+                    // zp offset
+                    "addi               s6, s1, 32                  \n\t"
+                    "addi               s1, s6, 8                   \n\t"
+                    "addi               s2, s1, 32                  \n\t"
+                    "addi               s3, s1, 32*2                \n\t"
+                    "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vsub.vv            v2, v2, v12                 \n\t"
-                "vsub.vv            v6, v6, v12                 \n\t"
-                "vsub.vv            v3, v3, v13                 \n\t"
-                "vsub.vv            v7, v7, v13                 \n\t"
-                "vsub.vv            v4, v4, v14                 \n\t"
-                "vsub.vv            v8, v8, v14                 \n\t"
-                "vsub.vv            v5, v5, v15                 \n\t"
-                "vsub.vv            v9, v9, v15                 \n\t"
+                    "add                a2, a1, %[LDA]              \n\t"
+                    "add                a3, a2, %[LDA]              \n\t"
+                    "add                a4, a3, %[LDA]              \n\t"
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v16, v16, v16               \n\t"
+                    // load a scale
+                    "flw                f1, (a1)                    \n\t"
+                    "addi               a1, a1, 4                   \n\t"
+                    "flw                f2, (a2)                    \n\t"
+                    "addi               a2, a2, -4                  \n\t"
+                    "flw                f3, (a3)                    \n\t"
+                    "addi               a3, a3, -12                 \n\t"
+                    "flw                f4, (a4)                    \n\t"
+                    "addi               a4, a4, -20                 \n\t"
+                    "addi               t2, %[INNER], 0             \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16_FP16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                    SQ4BIT_KERNEL_LOAD_ZP_16X1_v2 "BLOCK_INNER_LOOP%=:                            \n\t"
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                    LOAD_A_4x8x2 LOAD_B_16x8x2
+                    "vsub.vv            v2, v2, v12                 \n\t"
+                    "vsub.vv            v6, v6, v12                 \n\t"
+                    "vsub.vv            v3, v3, v13                 \n\t"
+                    "vsub.vv            v7, v7, v13                 \n\t"
+                    "vsub.vv            v4, v4, v14                 \n\t"
+                    "vsub.vv            v8, v8, v14                 \n\t"
+                    "vsub.vv            v5, v5, v15                 \n\t"
+                    "vsub.vv            v9, v9, v15                 \n\t"
+
+                    SQ4BIT_KERNEL_COMP_4x16x16
+
+                    "addi               t2, t2, -1                  \n\t"
+                    "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                    LOAD_SCALE_4x16_FP16
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vfcvt.f.x.v        v16, v16                    \n\t"
+                    "vfmacc.vv          v24, v16, v8                \n\t"
+                    "addi               t3, t3, -1                  \n\t"
+                    "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                    "RESULT_SAVE%=:                                 \n\t"
+
+                    SAVE_RESULT_4x16
+                    :
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
+                    : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
+                      "s4", "s5", "s6");
             }
         }
     } else {
         for (size_t n = 0; n < CountN; n += 16) {
             size_t NBLKS = (CountN - n) > 16 ? 16 : CountN - n;
-            std::byte* QuantBDataPtr = (std::byte*)QuantBData +          //
-                                       n * BlockCountK * BlkLen / 2 +    // b data
+            std::byte* QuantBDataPtr = (std::byte*)QuantBData +           //
+                                       n * BlockCountK * BlkLen / 2 +     // b data
                                        n * BlockCountK * sizeof(__fp16);  // scale
             float* CPtr = C + n;
             if (NBLKS < 16) {
-              CPtr = tmp;
-              LDC = 16 * sizeof(float);
+                CPtr = tmp;
+                LDC = 16 * sizeof(float);
             }
             if (Bias != nullptr) {
-              const float* bias = Bias + n;
-              if (NBLKS < 16) {
-                __asm__ volatile(
-                  "vsetvli        t0, %[N], e32, m2     \n\t"
-                  "vle32.v        v0, (%[SRC])          \n\t"
-                  "vse32.v        v0, (%[DST])          \n\t"
-                  :
-                  : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
-                  : "cc", "t0");
-                bias = tmp;
-              }
-              __asm__ volatile(
-                LOAD_BIAS
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "addi               a1, %[A], 0                 \n\t"
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                "addi               s5, s1, 0                   \n\t"
-                "addi               s1, s5, 32                  \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vadd.vi            v2, v2, -8                  \n\t"
-                "vadd.vi            v3, v3, -8                  \n\t"
-                "vadd.vi            v4, v4, -8                  \n\t"
-                "vadd.vi            v5, v5, -8                  \n\t"
-                "vadd.vi            v6, v6, -8                  \n\t"
-                "vadd.vi            v7, v7, -8                  \n\t"
-                "vadd.vi            v8, v8, -8                  \n\t"
-                "vadd.vi            v9, v9, -8                  \n\t"
+                const float* bias = Bias + n;
+                if (NBLKS < 16) {
+                    __asm__ volatile(
+                        "vsetvli        t0, %[N], e32, m2     \n\t"
+                        "vle32.v        v0, (%[SRC])          \n\t"
+                        "vse32.v        v0, (%[DST])          \n\t"
+                        :
+                        : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
+                        : "cc", "t0");
+                    bias = tmp;
+                }
+                __asm__ volatile(LOAD_BIAS
+                                 "addi               t3, %[BlockCountK], 0       \n\t"
+                                 "addi               a1, %[A], 0                 \n\t"
+                                 "addi               s1, %[B], 0                 \n\t"
+                                 "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                                 "addi               s5, s1, 0                   \n\t"
+                                 "addi               s1, s5, 32                  \n\t"
+                                 "addi               s2, s1, 32                  \n\t"
+                                 "addi               s3, s1, 32*2                \n\t"
+                                 "addi               s4, s1, 32*3                \n\t"
+                                 "add                a2, a1, %[LDA]              \n\t"
+                                 "add                a3, a2, %[LDA]              \n\t"
+                                 "add                a4, a3, %[LDA]              \n\t"
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vxor.vv            v16, v16, v16               \n\t"
+                                 // load a scale
+                                 "flw                f1, (a1)                    \n\t"
+                                 "addi               a1, a1, 4                   \n\t"
+                                 "flw                f2, (a2)                    \n\t"
+                                 "addi               a2, a2, -4                  \n\t"
+                                 "flw                f3, (a3)                    \n\t"
+                                 "addi               a3, a3, -12                 \n\t"
+                                 "flw                f4, (a4)                    \n\t"
+                                 "addi               a4, a4, -20                 \n\t"
+                                 "addi               t2, %[INNER], 0             \n\t"
+                                 "BLOCK_INNER_LOOP%=:                            \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16_FP16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ BIAS ] "r"(bias)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                                 LOAD_A_4x8x2 LOAD_B_16x8x2
+
+                                 "vadd.vi            v2, v2, -8                  \n\t"
+                                 "vadd.vi            v3, v3, -8                  \n\t"
+                                 "vadd.vi            v4, v4, -8                  \n\t"
+                                 "vadd.vi            v5, v5, -8                  \n\t"
+                                 "vadd.vi            v6, v6, -8                  \n\t"
+                                 "vadd.vi            v7, v7, -8                  \n\t"
+                                 "vadd.vi            v8, v8, -8                  \n\t"
+                                 "vadd.vi            v9, v9, -8                  \n\t"
+
+                                 SQ4BIT_KERNEL_COMP_4x16x16
+
+                                 "addi               t2, t2, -1                  \n\t"
+                                 "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                                 LOAD_SCALE_4x16_FP16
+
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vfcvt.f.x.v        v16, v16                    \n\t"
+                                 "vfmacc.vv          v24, v16, v8                \n\t"
+                                 "addi               t3, t3, -1                  \n\t"
+                                 "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                                 "RESULT_SAVE%=:                                 \n\t"
+
+                                 SAVE_RESULT_4x16
+                                 :
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
+                                   [ BIAS ] "r"(bias)
+                                 : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
+                                   "s2", "s3", "s4", "s5", "s6");
 
             } else {
-              __asm__ volatile(
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v24, v24, v24               \n\t"
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "addi               a1, %[A], 0                 \n\t"
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                "addi               s5, s1, 0                   \n\t"
-                "addi               s1, s5, 32                  \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vadd.vi            v2, v2, -8                  \n\t"
-                "vadd.vi            v3, v3, -8                  \n\t"
-                "vadd.vi            v4, v4, -8                  \n\t"
-                "vadd.vi            v5, v5, -8                  \n\t"
-                "vadd.vi            v6, v6, -8                  \n\t"
-                "vadd.vi            v7, v7, -8                  \n\t"
-                "vadd.vi            v8, v8, -8                  \n\t"
-                "vadd.vi            v9, v9, -8                  \n\t"
+                __asm__ volatile(
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v24, v24, v24               \n\t"
+                    "addi               t3, %[BlockCountK], 0       \n\t"
+                    "addi               a1, %[A], 0                 \n\t"
+                    "addi               s1, %[B], 0                 \n\t"
+                    "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                    "addi               s5, s1, 0                   \n\t"
+                    "addi               s1, s5, 32                  \n\t"
+                    "addi               s2, s1, 32                  \n\t"
+                    "addi               s3, s1, 32*2                \n\t"
+                    "addi               s4, s1, 32*3                \n\t"
+                    "add                a2, a1, %[LDA]              \n\t"
+                    "add                a3, a2, %[LDA]              \n\t"
+                    "add                a4, a3, %[LDA]              \n\t"
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v16, v16, v16               \n\t"
+                    // load a scale
+                    "flw                f1, (a1)                    \n\t"
+                    "addi               a1, a1, 4                   \n\t"
+                    "flw                f2, (a2)                    \n\t"
+                    "addi               a2, a2, -4                  \n\t"
+                    "flw                f3, (a3)                    \n\t"
+                    "addi               a3, a3, -12                 \n\t"
+                    "flw                f4, (a4)                    \n\t"
+                    "addi               a4, a4, -20                 \n\t"
+                    "addi               t2, %[INNER], 0             \n\t"
+                    "BLOCK_INNER_LOOP%=:                            \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16_FP16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                    LOAD_A_4x8x2 LOAD_B_16x8x2
+
+                    "vadd.vi            v2, v2, -8                  \n\t"
+                    "vadd.vi            v3, v3, -8                  \n\t"
+                    "vadd.vi            v4, v4, -8                  \n\t"
+                    "vadd.vi            v5, v5, -8                  \n\t"
+                    "vadd.vi            v6, v6, -8                  \n\t"
+                    "vadd.vi            v7, v7, -8                  \n\t"
+                    "vadd.vi            v8, v8, -8                  \n\t"
+                    "vadd.vi            v9, v9, -8                  \n\t"
+
+                    SQ4BIT_KERNEL_COMP_4x16x16
+
+                    "addi               t2, t2, -1                  \n\t"
+                    "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                    LOAD_SCALE_4x16_FP16
+
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vfcvt.f.x.v        v16, v16                    \n\t"
+                    "vfmacc.vv          v24, v16, v8                \n\t"
+                    "addi               t3, t3, -1                  \n\t"
+                    "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                    "RESULT_SAVE%=:                                 \n\t"
+
+                    SAVE_RESULT_4x16
+                    :
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
+                    : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
+                      "s4", "s5", "s6");
             }
-
         }
     }
     if (CountN % 16 != 0) {
-      // stroe output from tmp to C when NBLKS less than 16.
-      float* CPtr = C + CountN / 16 * 16;
-      const size_t N = CountN % 16;
-      LDC = ldc * sizeof(float);
-      __asm__ volatile(
-        "vsetvli            t0, %[N], e32, m2       \n\t"
-        "vle32.v            v0, (%[SRC])            \n\t"
-        "addi               s2, %[SRC], 64          \n\t"
-        "addi               s3, %[SRC], 64*2        \n\t"
-        "addi               s4, %[SRC], 64*3        \n\t"
-        "vle32.v            v2, (s2)                \n\t"
-        "vle32.v            v4, (s3)                \n\t"
-        "vle32.v            v6, (s4)                \n\t"
-        "add                t2, %[DST], %[LDC]      \n\t"
-        "add                t3, t2, %[LDC]          \n\t"
-        "add                t4, t3, %[LDC]          \n\t"
-        "vse32.v            v0, (%[DST])            \n\t"
-        "vse32.v            v2, (t2)                \n\t"
-        "vse32.v            v4, (t3)                \n\t"
-        "vse32.v            v6, (t4)                \n\t"
-        :
-        : [ N ] "r"(N), [ SRC ] "r"(tmp), [ DST ] "r"(CPtr), [ LDC ] "r"(LDC)
-        : "cc", "t0",
-          "t2", "t3", "t4",
-          "s2", "s3", "s4");
+        // stroe output from tmp to C when NBLKS less than 16.
+        float* CPtr = C + CountN / 16 * 16;
+        const size_t N = CountN % 16;
+        LDC = ldc * sizeof(float);
+        __asm__ volatile(
+            "vsetvli            t0, %[N], e32, m2       \n\t"
+            "vle32.v            v0, (%[SRC])            \n\t"
+            "addi               s2, %[SRC], 64          \n\t"
+            "addi               s3, %[SRC], 64*2        \n\t"
+            "addi               s4, %[SRC], 64*3        \n\t"
+            "vle32.v            v2, (s2)                \n\t"
+            "vle32.v            v4, (s3)                \n\t"
+            "vle32.v            v6, (s4)                \n\t"
+            "add                t2, %[DST], %[LDC]      \n\t"
+            "add                t3, t2, %[LDC]          \n\t"
+            "add                t4, t3, %[LDC]          \n\t"
+            "vse32.v            v0, (%[DST])            \n\t"
+            "vse32.v            v2, (t2)                \n\t"
+            "vse32.v            v4, (t3)                \n\t"
+            "vse32.v            v6, (t4)                \n\t"
+            :
+            : [ N ] "r"(N), [ SRC ] "r"(tmp), [ DST ] "r"(CPtr), [ LDC ] "r"(LDC)
+            : "cc", "t0", "t2", "t3", "t4", "s2", "s3", "s4");
     }
 }
 template <bool HasZeroPoint>
@@ -1703,155 +1705,166 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                                        n * BlockCountK * sizeof(float);         // scale
             float* CPtr = C + n;
             if (NBLKS < 16) {
-              CPtr = tmp;
-              LDC = 16 * sizeof(float);
+                CPtr = tmp;
+                LDC = 16 * sizeof(float);
             }
             if (Bias != nullptr) {
-              const float* bias = Bias + n;
-              if (NBLKS < 16) {
-                __asm__ volatile(
-                  "vsetvli        t0, %[N], e32, m2     \n\t"
-                  "vle32.v        v0, (%[SRC])          \n\t"
-                  "vse32.v        v0, (%[DST])          \n\t"
-                  :
-                  : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
-                  : "cc", "t0");
-                bias = tmp;
-              }
-              __asm__ volatile(
-                LOAD_BIAS
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "vsetvli            t0, zero, e8, m1            \n\t"
-                "vle8.v             v1, (%[ZPI])                \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                const float* bias = Bias + n;
+                if (NBLKS < 16) {
+                    __asm__ volatile(
+                        "vsetvli        t0, %[N], e32, m2     \n\t"
+                        "vle32.v        v0, (%[SRC])          \n\t"
+                        "vse32.v        v0, (%[DST])          \n\t"
+                        :
+                        : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
+                        : "cc", "t0");
+                    bias = tmp;
+                }
+                __asm__ volatile(LOAD_BIAS
+                                 "addi               t3, %[BlockCountK], 0       \n\t"
+                                 "vsetvli            t0, zero, e8, m1            \n\t"
+                                 "vle8.v             v1, (%[ZPI])                \n\t"
+                                 "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                // scale offset
-                "addi               s5, s1, 0                   \n\t"
-                // zp offset
-                "addi               s6, s1, 64                  \n\t"
-                "addi               s1, s6, 8                   \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                                 "addi               s1, %[B], 0                 \n\t"
+                                 "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                                 // scale offset
+                                 "addi               s5, s1, 0                   \n\t"
+                                 // zp offset
+                                 "addi               s6, s1, 64                  \n\t"
+                                 "addi               s1, s6, 8                   \n\t"
+                                 "addi               s2, s1, 32                  \n\t"
+                                 "addi               s3, s1, 32*2                \n\t"
+                                 "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vsub.vv            v2, v2, v12                 \n\t"
-                "vsub.vv            v6, v6, v12                 \n\t"
-                "vsub.vv            v3, v3, v13                 \n\t"
-                "vsub.vv            v7, v7, v13                 \n\t"
-                "vsub.vv            v4, v4, v14                 \n\t"
-                "vsub.vv            v8, v8, v14                 \n\t"
-                "vsub.vv            v5, v5, v15                 \n\t"
-                "vsub.vv            v9, v9, v15                 \n\t"
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                                 "add                a2, a1, %[LDA]              \n\t"
+                                 "add                a3, a2, %[LDA]              \n\t"
+                                 "add                a4, a3, %[LDA]              \n\t"
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vxor.vv            v16, v16, v16               \n\t"
+                                 // load a scale
+                                 "flw                f1, (a1)                    \n\t"
+                                 "addi               a1, a1, 4                   \n\t"
+                                 "flw                f2, (a2)                    \n\t"
+                                 "addi               a2, a2, -4                  \n\t"
+                                 "flw                f3, (a3)                    \n\t"
+                                 "addi               a3, a3, -12                 \n\t"
+                                 "flw                f4, (a4)                    \n\t"
+                                 "addi               a4, a4, -20                 \n\t"
+                                 "addi               t2, %[INNER], 0             \n\t"
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                                 SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
+
+                                 "BLOCK_INNER_LOOP%=:                            \n\t"
+
+                                 LOAD_A_4x8x2 LOAD_B_16x8x2
+
+                                 "vsub.vv            v2, v2, v12                 \n\t"
+                                 "vsub.vv            v6, v6, v12                 \n\t"
+                                 "vsub.vv            v3, v3, v13                 \n\t"
+                                 "vsub.vv            v7, v7, v13                 \n\t"
+                                 "vsub.vv            v4, v4, v14                 \n\t"
+                                 "vsub.vv            v8, v8, v14                 \n\t"
+                                 "vsub.vv            v5, v5, v15                 \n\t"
+                                 "vsub.vv            v9, v9, v15                 \n\t"
+
+                                 SQ4BIT_KERNEL_COMP_4x16x16
+
+                                 "addi               t2, t2, -1                  \n\t"
+                                 "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                                 LOAD_SCALE_4x16
+
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vfcvt.f.x.v        v16, v16                    \n\t"
+                                 "vfmacc.vv          v24, v16, v8                \n\t"
+                                 "addi               t3, t3, -1                  \n\t"
+                                 "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                                 "RESULT_SAVE%=:                                 \n\t"
+
+                                 SAVE_RESULT_4x16
+
+                                 :
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
+                                   [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
+                                 : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
+                                   "s2", "s3", "s4", "s5", "s6");
 
             } else {
-              __asm__ volatile(
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v24, v24, v24               \n\t"
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "vsetvli            t0, zero, e8, m1            \n\t"
-                "vle8.v             v1, (%[ZPI])                \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                __asm__ volatile(
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v24, v24, v24               \n\t"
+                    "addi               t3, %[BlockCountK], 0       \n\t"
+                    "vsetvli            t0, zero, e8, m1            \n\t"
+                    "vle8.v             v1, (%[ZPI])                \n\t"
+                    "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                // scale offset
-                "addi               s5, s1, 0                   \n\t"
-                // zp offset
-                "addi               s6, s1, 64                  \n\t"
-                "addi               s1, s6, 8                   \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                    "addi               s1, %[B], 0                 \n\t"
+                    "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                    // scale offset
+                    "addi               s5, s1, 0                   \n\t"
+                    // zp offset
+                    "addi               s6, s1, 64                  \n\t"
+                    "addi               s1, s6, 8                   \n\t"
+                    "addi               s2, s1, 32                  \n\t"
+                    "addi               s3, s1, 32*2                \n\t"
+                    "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vsub.vv            v2, v2, v12                 \n\t"
-                "vsub.vv            v6, v6, v12                 \n\t"
-                "vsub.vv            v3, v3, v13                 \n\t"
-                "vsub.vv            v7, v7, v13                 \n\t"
-                "vsub.vv            v4, v4, v14                 \n\t"
-                "vsub.vv            v8, v8, v14                 \n\t"
-                "vsub.vv            v5, v5, v15                 \n\t"
-                "vsub.vv            v9, v9, v15                 \n\t"
+                    "add                a2, a1, %[LDA]              \n\t"
+                    "add                a3, a2, %[LDA]              \n\t"
+                    "add                a4, a3, %[LDA]              \n\t"
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v16, v16, v16               \n\t"
+                    // load a scale
+                    "flw                f1, (a1)                    \n\t"
+                    "addi               a1, a1, 4                   \n\t"
+                    "flw                f2, (a2)                    \n\t"
+                    "addi               a2, a2, -4                  \n\t"
+                    "flw                f3, (a3)                    \n\t"
+                    "addi               a3, a3, -12                 \n\t"
+                    "flw                f4, (a4)                    \n\t"
+                    "addi               a4, a4, -20                 \n\t"
+                    "addi               t2, %[INNER], 0             \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                    SQ4BIT_KERNEL_LOAD_ZP_16X1_v2
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                    "BLOCK_INNER_LOOP%=:                            \n\t"
+
+                    LOAD_A_4x8x2 LOAD_B_16x8x2
+
+                    "vsub.vv            v2, v2, v12                 \n\t"
+                    "vsub.vv            v6, v6, v12                 \n\t"
+                    "vsub.vv            v3, v3, v13                 \n\t"
+                    "vsub.vv            v7, v7, v13                 \n\t"
+                    "vsub.vv            v4, v4, v14                 \n\t"
+                    "vsub.vv            v8, v8, v14                 \n\t"
+                    "vsub.vv            v5, v5, v15                 \n\t"
+                    "vsub.vv            v9, v9, v15                 \n\t"
+
+                    SQ4BIT_KERNEL_COMP_4x16x16
+
+                    "addi               t2, t2, -1                  \n\t"
+                    "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                    LOAD_SCALE_4x16
+
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vfcvt.f.x.v        v16, v16                    \n\t"
+                    "vfmacc.vv          v24, v16, v8                \n\t"
+                    "addi               t3, t3, -1                  \n\t"
+                    "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                    "RESULT_SAVE%=:                                 \n\t"
+
+                    SAVE_RESULT_4x16
+
+                    :
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
+                    : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
+                      "s4", "s5", "s6");
             }
         }
     } else {
@@ -1862,174 +1875,174 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                                        n * BlockCountK * sizeof(float);  // scale
             float* CPtr = C + n;
             if (NBLKS < 16) {
-              CPtr = tmp;
-              LDC = 16 * sizeof(float);
+                CPtr = tmp;
+                LDC = 16 * sizeof(float);
             }
             if (Bias != nullptr) {
-              const float* bias = Bias + n;
-              if (NBLKS < 16) {
-                __asm__ volatile(
-                  "vsetvli        t0, %[N], e32, m2     \n\t"
-                  "vle32.v        v0, (%[SRC])          \n\t"
-                  "vse32.v        v0, (%[DST])          \n\t"
-                  :
-                  : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
-                  : "cc", "t0");
-                bias = tmp;
-              }
-              __asm__ volatile(
-                LOAD_BIAS
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                const float* bias = Bias + n;
+                if (NBLKS < 16) {
+                    __asm__ volatile(
+                        "vsetvli        t0, %[N], e32, m2     \n\t"
+                        "vle32.v        v0, (%[SRC])          \n\t"
+                        "vse32.v        v0, (%[DST])          \n\t"
+                        :
+                        : [ SRC ] "r"(bias), [ DST ] "r"(tmp), [ N ] "r"(NBLKS)
+                        : "cc", "t0");
+                    bias = tmp;
+                }
+                __asm__ volatile(LOAD_BIAS
+                                 "addi               t3, %[BlockCountK], 0       \n\t"
+                                 "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                "addi               s5, s1, 0                   \n\t"
-                "addi               s1, s5, 64                  \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                                 "addi               s1, %[B], 0                 \n\t"
+                                 "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                                 "addi               s5, s1, 0                   \n\t"
+                                 "addi               s1, s5, 64                  \n\t"
+                                 "addi               s2, s1, 32                  \n\t"
+                                 "addi               s3, s1, 32*2                \n\t"
+                                 "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vadd.vi            v2, v2, -8                  \n\t"
-                "vadd.vi            v3, v3, -8                  \n\t"
-                "vadd.vi            v4, v4, -8                  \n\t"
-                "vadd.vi            v5, v5, -8                  \n\t"
-                "vadd.vi            v6, v6, -8                  \n\t"
-                "vadd.vi            v7, v7, -8                  \n\t"
-                "vadd.vi            v8, v8, -8                  \n\t"
-                "vadd.vi            v9, v9, -8                  \n\t"
+                                 "add                a2, a1, %[LDA]              \n\t"
+                                 "add                a3, a2, %[LDA]              \n\t"
+                                 "add                a4, a3, %[LDA]              \n\t"
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vxor.vv            v16, v16, v16               \n\t"
+                                 // load a scale
+                                 "flw                f1, (a1)                    \n\t"
+                                 "addi               a1, a1, 4                   \n\t"
+                                 "flw                f2, (a2)                    \n\t"
+                                 "addi               a2, a2, -4                  \n\t"
+                                 "flw                f3, (a3)                    \n\t"
+                                 "addi               a3, a3, -12                 \n\t"
+                                 "flw                f4, (a4)                    \n\t"
+                                 "addi               a4, a4, -20                 \n\t"
+                                 "addi               t2, %[INNER], 0             \n\t"
+                                 "BLOCK_INNER_LOOP%=:                            \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                                 LOAD_A_4x8x2 LOAD_B_16x8x2
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr), [ BIAS ] "r"(bias)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                                 "vadd.vi            v2, v2, -8                  \n\t"
+                                 "vadd.vi            v3, v3, -8                  \n\t"
+                                 "vadd.vi            v4, v4, -8                  \n\t"
+                                 "vadd.vi            v5, v5, -8                  \n\t"
+                                 "vadd.vi            v6, v6, -8                  \n\t"
+                                 "vadd.vi            v7, v7, -8                  \n\t"
+                                 "vadd.vi            v8, v8, -8                  \n\t"
+                                 "vadd.vi            v9, v9, -8                  \n\t"
+
+                                 SQ4BIT_KERNEL_COMP_4x16x16
+
+                                 "addi               t2, t2, -1                  \n\t"
+                                 "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                                 LOAD_SCALE_4x16
+
+                                 "vsetvli            t0, zero, e32, m8           \n\t"
+                                 "vfcvt.f.x.v        v16, v16                    \n\t"
+                                 "vfmacc.vv          v24, v16, v8                \n\t"
+                                 "addi               t3, t3, -1                  \n\t"
+                                 "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                                 "RESULT_SAVE%=:                                 \n\t" SAVE_RESULT_4x16
+                                 :
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
+                                   [ BIAS ] "r"(bias)
+                                 : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
+                                   "s2", "s3", "s4", "s5", "s6");
 
             } else {
-              __asm__ volatile(
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v24, v24, v24               \n\t"
-                "addi               t3, %[BlockCountK], 0       \n\t"
-                "addi               a1, %[A], 0                 \n\t"
+                __asm__ volatile(
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v24, v24, v24               \n\t"
+                    "addi               t3, %[BlockCountK], 0       \n\t"
+                    "addi               a1, %[A], 0                 \n\t"
 
-                "addi               s1, %[B], 0                 \n\t"
-                "BLOCK_COUNTK_LOOP%=:                           \n\t"
-                "addi               s5, s1, 0                   \n\t"
-                "addi               s1, s5, 64                  \n\t"
-                "addi               s2, s1, 32                  \n\t"
-                "addi               s3, s1, 32*2                \n\t"
-                "addi               s4, s1, 32*3                \n\t"
+                    "addi               s1, %[B], 0                 \n\t"
+                    "BLOCK_COUNTK_LOOP%=:                           \n\t"
+                    "addi               s5, s1, 0                   \n\t"
+                    "addi               s1, s5, 64                  \n\t"
+                    "addi               s2, s1, 32                  \n\t"
+                    "addi               s3, s1, 32*2                \n\t"
+                    "addi               s4, s1, 32*3                \n\t"
 
-                "add                a2, a1, %[LDA]              \n\t"
-                "add                a3, a2, %[LDA]              \n\t"
-                "add                a4, a3, %[LDA]              \n\t"
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vxor.vv            v16, v16, v16               \n\t"
-                //load a scale
-                "flw                f1, (a1)                    \n\t"
-                "addi               a1, a1, 4                   \n\t"
-                "flw                f2, (a2)                    \n\t"
-                "addi               a2, a2, -4                  \n\t"
-                "flw                f3, (a3)                    \n\t"
-                "addi               a3, a3, -12                 \n\t"
-                "flw                f4, (a4)                    \n\t"
-                "addi               a4, a4, -20                 \n\t"
-                "addi               t2, %[INNER], 0             \n\t"
-                "BLOCK_INNER_LOOP%=:                            \n\t"
-                LOAD_A_4x8x2
-                LOAD_B_16x8x2
-                "vadd.vi            v2, v2, -8                  \n\t"
-                "vadd.vi            v3, v3, -8                  \n\t"
-                "vadd.vi            v4, v4, -8                  \n\t"
-                "vadd.vi            v5, v5, -8                  \n\t"
-                "vadd.vi            v6, v6, -8                  \n\t"
-                "vadd.vi            v7, v7, -8                  \n\t"
-                "vadd.vi            v8, v8, -8                  \n\t"
-                "vadd.vi            v9, v9, -8                  \n\t"
+                    "add                a2, a1, %[LDA]              \n\t"
+                    "add                a3, a2, %[LDA]              \n\t"
+                    "add                a4, a3, %[LDA]              \n\t"
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vxor.vv            v16, v16, v16               \n\t"
+                    // load a scale
+                    "flw                f1, (a1)                    \n\t"
+                    "addi               a1, a1, 4                   \n\t"
+                    "flw                f2, (a2)                    \n\t"
+                    "addi               a2, a2, -4                  \n\t"
+                    "flw                f3, (a3)                    \n\t"
+                    "addi               a3, a3, -12                 \n\t"
+                    "flw                f4, (a4)                    \n\t"
+                    "addi               a4, a4, -20                 \n\t"
+                    "addi               t2, %[INNER], 0             \n\t"
+                    "BLOCK_INNER_LOOP%=:                            \n\t"
 
-                SQ4BIT_KERNEL_COMP_4x16x16
-                "addi               t2, t2, -1                  \n\t"
-                "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
-                LOAD_SCALE_4x16
-                "vsetvli            t0, zero, e32, m8           \n\t"
-                "vfcvt.f.x.v        v16, v16                    \n\t"
-                "vfmacc.vv          v24, v16, v8                \n\t"
-                "addi               t3, t3, -1                  \n\t"
-                "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+                    LOAD_A_4x8x2 LOAD_B_16x8x2
 
-                "RESULT_SAVE%=:                                 \n\t"
-                SAVE_RESULT_4x16
-                :
-                : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                  [ LDA ] "r"(lda), [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK),
-                  [ C ] "r"(CPtr)
-                : "cc", "t0", "t1", "t2", "t3",
-                  "a1", "a2", "a3", "a4",
-                  "f1", "f2", "f3", "f4",
-                  "s1", "s2", "s3", "s4", "s5", "s6");
+                    "vadd.vi            v2, v2, -8                  \n\t"
+                    "vadd.vi            v3, v3, -8                  \n\t"
+                    "vadd.vi            v4, v4, -8                  \n\t"
+                    "vadd.vi            v5, v5, -8                  \n\t"
+                    "vadd.vi            v6, v6, -8                  \n\t"
+                    "vadd.vi            v7, v7, -8                  \n\t"
+                    "vadd.vi            v8, v8, -8                  \n\t"
+                    "vadd.vi            v9, v9, -8                  \n\t"
+
+                    SQ4BIT_KERNEL_COMP_4x16x16
+
+                    "addi               t2, t2, -1                  \n\t"
+                    "bnez               t2, BLOCK_INNER_LOOP%=      \n\t"
+
+                    LOAD_SCALE_4x16
+
+                    "vsetvli            t0, zero, e32, m8           \n\t"
+                    "vfcvt.f.x.v        v16, v16                    \n\t"
+                    "vfmacc.vv          v24, v16, v8                \n\t"
+                    "addi               t3, t3, -1                  \n\t"
+                    "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
+
+                    "RESULT_SAVE%=:                                 \n\t"
+
+                    SAVE_RESULT_4x16
+
+                    :
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDA ] "r"(lda),
+                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
+                    : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
+                      "s4", "s5", "s6");
             }
-
         }
     }
     if (CountN % 16 != 0) {
-      // stroe output from tmp to C when NBLKS less than 16.
-      float* CPtr = C + CountN / 16 * 16;
-      const size_t N = CountN % 16;
-      LDC = ldc * sizeof(float);
-      __asm__ volatile(
-        "vsetvli            t0, %[N], e32, m2       \n\t"
-        "vle32.v            v0, (%[SRC])            \n\t"
-        "addi               s2, %[SRC], 64          \n\t"
-        "addi               s3, %[SRC], 64*2        \n\t"
-        "addi               s4, %[SRC], 64*3        \n\t"
-        "vle32.v            v2, (s2)                \n\t"
-        "vle32.v            v4, (s3)                \n\t"
-        "vle32.v            v6, (s4)                \n\t"
-        "add                t2, %[DST], %[LDC]      \n\t"
-        "add                t3, t2, %[LDC]          \n\t"
-        "add                t4, t3, %[LDC]          \n\t"
-        "vse32.v            v0, (%[DST])            \n\t"
-        "vse32.v            v2, (t2)                \n\t"
-        "vse32.v            v4, (t3)                \n\t"
-        "vse32.v            v6, (t4)                \n\t"
-        :
-        : [ N ] "r"(N), [ SRC ] "r"(tmp), [ DST ] "r"(CPtr), [ LDC ] "r"(LDC)
-        : "cc", "t0",
-          "t2", "t3", "t4",
-          "s2", "s3", "s4");
+        // stroe output from tmp to C when NBLKS less than 16.
+        float* CPtr = C + CountN / 16 * 16;
+        const size_t N = CountN % 16;
+        LDC = ldc * sizeof(float);
+        __asm__ volatile(
+            "vsetvli            t0, %[N], e32, m2       \n\t"
+            "vle32.v            v0, (%[SRC])            \n\t"
+            "addi               s2, %[SRC], 64          \n\t"
+            "addi               s3, %[SRC], 64*2        \n\t"
+            "addi               s4, %[SRC], 64*3        \n\t"
+            "vle32.v            v2, (s2)                \n\t"
+            "vle32.v            v4, (s3)                \n\t"
+            "vle32.v            v6, (s4)                \n\t"
+            "add                t2, %[DST], %[LDC]      \n\t"
+            "add                t3, t2, %[LDC]          \n\t"
+            "add                t4, t3, %[LDC]          \n\t"
+            "vse32.v            v0, (%[DST])            \n\t"
+            "vse32.v            v2, (t2)                \n\t"
+            "vse32.v            v4, (t3)                \n\t"
+            "vse32.v            v6, (t4)                \n\t"
+            :
+            : [ N ] "r"(N), [ SRC ] "r"(tmp), [ DST ] "r"(CPtr), [ LDC ] "r"(LDC)
+            : "cc", "t0", "t2", "t3", "t4", "s2", "s3", "s4");
     }
 }
 
@@ -2956,12 +2969,12 @@ SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen(size_t BlkLen,
                                              const size_t scalestride)
 {
     if (scalestride == 4) {
-          SQ4BitGemmM4Kernel_CompInt8_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                         CountN, BlockStrideQuantB, Bias, lda, ldc);
+        SQ4BitGemmM4Kernel_CompInt8_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
+                                                       CountN, BlockStrideQuantB, Bias, lda, ldc);
 
     } else if (scalestride == 2) {
-          SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                         CountN, BlockStrideQuantB, Bias, lda, ldc);
+        SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl<HasZeroPoint>(
+            BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C, CountN, BlockStrideQuantB, Bias, lda, ldc);
     }
 }
 
@@ -2982,11 +2995,11 @@ SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen(size_t BlkLen,
                                              const size_t scalestride)
 {
     if (scalestride == 4) {
-          SQ4BitGemmM1Kernel_CompInt8_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                         CountN, BlockStrideQuantB, Bias);
+        SQ4BitGemmM1Kernel_CompInt8_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
+                                                       CountN, BlockStrideQuantB, Bias);
     } else if (scalestride == 2) {
-          SQ4BitGemmM1Kernel_CompInt8_ScaleFp16_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                         CountN, BlockStrideQuantB, Bias);
+        SQ4BitGemmM1Kernel_CompInt8_ScaleFp16_Impl<HasZeroPoint>(BlkLen, QuantA, QuantBData, QuantBScale,
+                                                                 QuantBZeroPoint, C, CountN, BlockStrideQuantB, Bias);
     }
 }
 
@@ -3010,27 +3023,29 @@ SQ4BitGemmKernel_CompInt8(size_t BlkLen,
     MLAS_UNREFERENCED_PARAMETER(CountM);
     MLAS_UNREFERENCED_PARAMETER(CountK);
     MLAS_UNREFERENCED_PARAMETER(ldc);
-    const size_t lda = BlockCountK  * Q8BlkSize(BlkLen);
+    const size_t lda = BlockCountK * Q8BlkSize(BlkLen);
     if (CountM > 4) {
-
-    if (QuantBZeroPoint != nullptr) {
-        SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                           CountM, CountN, BlockCountK, Bias, lda,ldc,ScaleStride);
+        if (QuantBZeroPoint != nullptr) {
+            SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint,
+                                                               C, CountM, CountN, BlockCountK, Bias, lda, ldc,
+                                                               ScaleStride);
+        } else {
+            SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale,
+                                                                QuantBZeroPoint, C, CountM, CountN, BlockCountK, Bias,
+                                                                lda, ldc, ScaleStride);
+        }
+        return 4;
     } else {
-        SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                            CountM, CountN, BlockCountK, Bias, lda,ldc,ScaleStride);
-    }
-      return 4;
-    } else {
-
-    if (QuantBZeroPoint != nullptr) {
-        SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                           CountM, CountN, BlockCountK, Bias, lda,ldc,ScaleStride);
-    } else {
-        SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint, C,
-                                                            CountM, CountN, BlockCountK, Bias, lda,ldc,ScaleStride);
-    }
-      return 1;
+        if (QuantBZeroPoint != nullptr) {
+            SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint,
+                                                               C, CountM, CountN, BlockCountK, Bias, lda, ldc,
+                                                               ScaleStride);
+        } else {
+            SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale,
+                                                                QuantBZeroPoint, C, CountM, CountN, BlockCountK, Bias,
+                                                                lda, ldc, ScaleStride);
+        }
+        return 1;
     }
 }
 }  // namespace sqnbitgemm_spacemit_ime

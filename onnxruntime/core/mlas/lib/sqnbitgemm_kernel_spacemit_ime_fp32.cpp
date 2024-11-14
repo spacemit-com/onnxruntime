@@ -8,7 +8,7 @@
 #include <cassert>
 #include <utility>
 
-#include "sqnbitgemm.h"
+#include "qnbitgemm.h"
 #include "sqnbitgemm_kernel_spacemit_ime.h"
 #include "sqnbitgemm_q8_block.h"
 
@@ -22,7 +22,7 @@ void
 SQ4BitGemmPackQuantBData(size_t N,
                          size_t K,
                          size_t BlkLen,
-                         MLAS_SQNBIT_GEMM_COMPUTE_TYPE ComputeType,
+                         MLAS_QNBIT_GEMM_COMPUTE_TYPE ComputeType,
                          const std::byte* QuantBDataBegin,
                          std::byte* PackedQuantBDataBegin,
                          MLAS_THREADPOOL* ThreadPool)
@@ -30,7 +30,7 @@ SQ4BitGemmPackQuantBData(size_t N,
     constexpr size_t BlkBitWidth = 4;
 
     assert(BlkLen >= 16 && BlkLen % 16 == 0);
-    assert(ComputeType == MLAS_SQNBIT_GEMM_COMPUTE_TYPE::CompFp32);
+    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::CompFp32);
     const size_t BlockCountK = MlasDivRoundup(K, BlkLen);
     const size_t BlkDataSize = MlasQNBitBlkDataSizeInBytes(BlkBitWidth, BlkLen);
     const size_t Iterations = N * BlockCountK;  // one iteration per block
@@ -238,7 +238,7 @@ SQ4BitGemmM1Kernel_CompFp32_Impl(size_t BlkLen,
 
 template <bool HasZeroPoint>
 void
-Q4BitBlkDequantBForSgemm_CompFp32_Impl(size_t BlkLen,
+SQ4BitBlkDequantBForSgemm_CompFp32_Impl(size_t BlkLen,
                                        float* FpData,
                                        const std::byte* QuantBData,
                                        const float* QuantBScale,
@@ -315,7 +315,7 @@ Q4BitBlkDequantBForSgemm_CompFp32_Impl(size_t BlkLen,
 }  // namespace
 
 void
-Q4BitBlkDequantBForSgemm_CompFp32(size_t BlkLen,
+SQ4BitBlkDequantBForSgemm_CompFp32(size_t BlkLen,
                                   float* FpData,
                                   const std::byte* QuantBData,
                                   const float* QuantBScale,
@@ -325,10 +325,10 @@ Q4BitBlkDequantBForSgemm_CompFp32(size_t BlkLen,
                                   size_t BlockStrideQuantB)
 {
     if (QuantBZeroPoint != nullptr) {
-        Q4BitBlkDequantBForSgemm_CompFp32_Impl<true>(BlkLen, FpData, QuantBData, QuantBScale, QuantBZeroPoint, CountN,
+        SQ4BitBlkDequantBForSgemm_CompFp32_Impl<true>(BlkLen, FpData, QuantBData, QuantBScale, QuantBZeroPoint, CountN,
                                                      CountK, BlockStrideQuantB);
     } else {
-        Q4BitBlkDequantBForSgemm_CompFp32_Impl<false>(BlkLen, FpData, QuantBData, QuantBScale, QuantBZeroPoint, CountN,
+        SQ4BitBlkDequantBForSgemm_CompFp32_Impl<false>(BlkLen, FpData, QuantBData, QuantBScale, QuantBZeroPoint, CountN,
                                                       CountK, BlockStrideQuantB);
     }
 }
