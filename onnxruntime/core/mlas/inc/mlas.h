@@ -1918,7 +1918,8 @@ MlasMul(
 );
 
 template <typename T, bool simplified, bool has_skip_output>
-void MLASCALL
+void
+MLASCALL
 MlasSkipLayerNormalizationPerTask(
     const T* input,
     const T* skip_input,
@@ -1930,5 +1931,31 @@ MlasSkipLayerNormalizationPerTask(
     int64_t hidden_size,
     ptrdiff_t task_idx,
     float epsilon,
-    size_t skip_size
+    size_t skip_size,
+    float* mean_out,
+    float* mean_square_out
+);
+
+template <typename T, bool simplified>
+void 
+MLASCALL
+MlasLayerNormalizationPerTask(
+    const T* input,
+    T* output,
+    const T* gamma_data,
+    const T* beta_data,
+    int64_t hidden_size,
+    ptrdiff_t task_idx,
+    float epsilon,
+    float* mean_out,
+    float* mean_square_out
+);
+
+
+void 
+MLASCALL
+MlasCopy(
+    void *dst,
+    const void *src,
+    size_t size
 );

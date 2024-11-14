@@ -36,6 +36,29 @@ void ComputeJob(
   ORT_UNUSED_PARAMETER(bias_float_ptr);   // only used in MLFloat16 overload
   ORT_UNUSED_PARAMETER(alloc);
 
+#if defined(MLAS_TARGET_RISCV64)
+  if constexpr (std::is_same<T, float>::value) {
+      float mean_out, mean_square_out;
+      if (simplified) {
+        MlasLayerNormalizationPerTask<float, true>(X_data, Y_data, scale_data, bias_data,
+                      norm_size, task_idx, epsilon, &mean_out, &mean_square_out);
+      } else {
+        MlasLayerNormalizationPerTask<float, false>(X_data, Y_data, scale_data, bias_data,
+                      norm_size, task_idx, epsilon, &mean_out, &mean_square_out);
+      }
+
+      if (mean_data != nullptr) {
+        // ONNX spec doesn't support 'double' for 'U' so when 'T' == double, 'U' == float and we need to narrow
+        mean_data[task_idx] = gsl::narrow_cast<float>(mean_out);
+      }
+
+      if (inv_std_dev_data != nullptr) {
+        inv_std_dev_data[task_idx] = gsl::narrow_cast<float>(1 / mean_square_out);
+      }
+      return;
+  }
+#endif
+
   const T* p_input = X_data + task_idx * norm_size;
   T* p_output = Y_data + task_idx * norm_size;
 

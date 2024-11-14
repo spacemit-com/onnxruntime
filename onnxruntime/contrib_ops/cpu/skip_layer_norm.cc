@@ -269,16 +269,19 @@ Status SkipLayerNorm<T, simplified>::Compute(OpKernelContext* p_ctx) const {
       [&](ptrdiff_t task_idx) {
 #if defined(MLAS_TARGET_RISCV64)
         if constexpr (std::is_same<T, float>::value) {
+          float mean_out, mean_square_out;
           if (skip_input_bias_add_output_data != nullptr) {
             MlasSkipLayerNormalizationPerTask<float, simplified, true>(
               input_data, skip_data, output_data, skip_input_bias_add_output_data,
-              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size
+              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size,
+              &mean_out, &mean_square_out
             );
             return Status::OK();
           } else {
             MlasSkipLayerNormalizationPerTask<float, simplified, false>(
               input_data, skip_data, output_data, nullptr,
-              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size
+              gamma_data, beta_data, bias_data, hidden_size, task_idx, epsilon_, skip_size,
+              &mean_out, &mean_square_out
             );
             return Status::OK();
           }

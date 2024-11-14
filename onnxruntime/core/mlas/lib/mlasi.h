@@ -167,6 +167,7 @@ using MLAS_CPUIDINFO = onnxruntime::CPUIDInfo;
 #include "core/framework/float16.h"
 
 #else  // BUILD_MLAS_NO_ONNXRUNTIME
+#include <cstring>
 
 class MLASCPUIDInfo
 {

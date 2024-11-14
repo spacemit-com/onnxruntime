@@ -748,3 +748,57 @@ thread_local std::unique_ptr<uint8_t, decltype(&_aligned_free)> ThreadedBufHolde
 #else
 thread_local std::unique_ptr<uint8_t, decltype(&free)> ThreadedBufHolder(nullptr, &free);
 #endif
+
+
+#ifdef MLAS_TARGET_RISCV64
+void MLASCALL
+MlasCopy(void *dst, const void *src, size_t size)
+{
+    __asm__ volatile(
+        "srli      t0,       %[size],    10        \n\t"  // 1024B
+        "blez      t0,       memcpy_tail%=         \n\t"
+        "vsetvli   t1,       x0,         e8,       m8\n\t"
+        "memcpy_main_loop%=:                       \n\t"
+        "addi      t0,       t0,         -1        \n\t"
+        "vle8.v    v0,       (%[s])                \n\t"
+        "addi      %[s],     %[s],       256       \n\t"
+        "vle8.v    v8,       (%[s])                \n\t"
+        "addi      %[s],     %[s],       256       \n\t"
+        "vle8.v    v16,      (%[s])                \n\t"
+        "addi      %[s],     %[s],       256       \n\t"
+        "vle8.v    v24,      (%[s])                \n\t"
+        "addi      %[s],     %[s],       256       \n\t"
+        "vse8.v    v0,       (%[d])                \n\t"
+        "addi      %[d],     %[d],       256       \n\t"
+        "vse8.v    v8,       (%[d])                \n\t"
+        "addi      %[d],     %[d],       256       \n\t"
+        "vse8.v    v16,      (%[d])                \n\t"
+        "addi      %[d],     %[d],       256       \n\t"
+        "vse8.v    v24,      (%[d])                \n\t"
+        "addi      %[d],     %[d],       256       \n\t"
+        "bnez      t0,       memcpy_main_loop%=    \n\t"
+        "memcpy_tail%=:                            \n\t"
+        "andi      t1,       %[size],    1023      \n\t"
+        "memcpy_tail_loop%=:                       \n\t"
+        "vsetvli   t0,       t1,         e8,       m8\n\t"
+        "sub       t1,       t1,         t0        \n\t"
+        "vle8.v    v0,       (%[s])                \n\t"
+        "add       %[s],     %[s],       t0        \n\t"
+        "vse8.v    v0,       (%[d])                \n\t"
+        "add       %[d],     %[d],       t0        \n\t"
+        "bnez      t1,       memcpy_tail_loop%=    \n\t"
+        : [ s ] "+r"(src), [ d ] "+r"(dst)
+        : [ size ] "r"(size)
+        : "cc", "t0", "t1");
+}
+#else
+void 
+MLASCALL
+MlasCopy(
+    void *dst,
+    const void *src,
+    size_t size
+) {
+    memcpy(dst, src, size);
+}
+#endif
