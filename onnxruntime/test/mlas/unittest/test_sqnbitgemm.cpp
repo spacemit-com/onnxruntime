@@ -418,7 +418,7 @@ class SQNBitGemmShortExecuteTest : public MlasTestFixture<MlasSQNBitGemmTest<Blk
       for (bool WithThreadpool : {false, true}) {
         for (bool Symmetric : {true, false}) {
 #ifdef MLAS_TARGET_RISCV64
-          for (MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp32}) {
+          for (MLAS_QNBIT_GEMM_SCALE_TYPE ScaleType : {ScaleFp16, ScaleFp32}) {
             if (ComputeType == SQNBIT_CompFp32 && ScaleType == ScaleFp16) {
               continue;
             }

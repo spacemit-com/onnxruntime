@@ -440,6 +440,24 @@ struct MLAS_QNBIT_GEMM_DISPATCH {
     SQ4BitGemmKernel_CompInt8WithScale_Fn* SQ4BitGemmKernel_CompInt8WithScale = nullptr;
 
     /**
+     * @brief Block quantize values from four row of matrix A from floats to quantized 8-bit integers.
+     *
+     * @param       BlkLen  Number of values in a block.
+     * @param       A       Supplies the A matrix.
+     * @param       CountK  Number of columns of A.
+     * @param[out]  QuantA  Supplies the output quantized A matrix.
+     *                      Binary data containing block quantized int8 data and scale values.
+     */
+    typedef void(QuantizeAM4Row_CompInt8_Fn)(
+        size_t BlkLen,
+        const float* A,
+        size_t CountK,
+        std::byte* QuantA
+    );
+
+    QuantizeAM4Row_CompInt8_Fn* QuantizeAM4Row_CompInt8 = nullptr;
+
+    /**
      * @brief Block quantize values from one row of matrix A from floats to quantized 8-bit integers.
      *
      * @param       BlkLen  Number of values in a block.

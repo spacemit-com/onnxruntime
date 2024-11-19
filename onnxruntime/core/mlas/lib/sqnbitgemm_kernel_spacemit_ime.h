@@ -60,6 +60,9 @@ SQ4BitGemmKernel_CompInt8(size_t BlkLen,
                           const size_t ScaleStride);
 
 void
+QuantizeAM4Row_CompInt8(size_t BlkLen, const float* A, size_t CountK, std::byte* QuantA);
+
+void
 QuantizeARow_CompInt8(size_t BlkLen, const float* A, size_t CountK, std::byte* QuantA);
 
 void

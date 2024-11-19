@@ -106,6 +106,7 @@ const MLAS_QNBIT_GEMM_DISPATCH MlasSQNBitGemmDispatchSpacemiTIme = []() {
     d.SQ4BitBlkDequantBForSgemm_CompFp32 = sqnbitgemm_spacemit_ime::SQ4BitBlkDequantBForSgemm_CompFp32;
 
     d.SQ4BitGemmKernel_CompInt8WithScale = sqnbitgemm_spacemit_ime::SQ4BitGemmKernel_CompInt8;
+    d.QuantizeAM4Row_CompInt8 = sqnbitgemm_spacemit_ime::QuantizeAM4Row_CompInt8;
     d.QuantizeARow_CompInt8 = sqnbitgemm_spacemit_ime::QuantizeARow_CompInt8;
 
     return d;

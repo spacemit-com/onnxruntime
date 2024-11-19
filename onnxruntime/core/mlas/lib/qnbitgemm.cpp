@@ -92,6 +92,7 @@ MlasIsQNBitGemmAvailable(
         case SQNBitGemmVariant_BitWidth4_CompInt8: { // SQ4BitGemmKernel_BlkSum_CompInt8
             return
               (Dispatch->SQ4BitGemmKernel_CompInt8 != nullptr && Dispatch->QuantizeARow_CompInt8 != nullptr) ||
+              (Dispatch->SQ4BitGemmKernel_CompInt8WithScale!= nullptr && Dispatch->QuantizeARow_CompInt8 !=nullptr) ||
               (Dispatch->SQ4BitGemmKernel_BlkSum_CompInt8 != nullptr && Dispatch->QuantizeARowComputeBlkSum_CompInt8 != nullptr);
         }
         default: {
@@ -778,10 +779,39 @@ InitializeWorkspace_CompInt8<float>(
 
     const auto QuantizeARow = GetMlasPlatform().QNBitGemmDispatch->QuantizeARow_CompInt8;
     const auto QuantizeARow2 = GetMlasPlatform().QNBitGemmDispatch->QuantizeARowComputeBlkSum_CompInt8;
+    const auto QuantizeAM4Row = GetMlasPlatform().QNBitGemmDispatch->QuantizeAM4Row_CompInt8;
 
     const size_t BlockCountK = MlasDivRoundup(K, BlkLen);
     const size_t QuantAStride = BlockCountK * Q8BlkSize(BlkLen);
 
+    if (QuantizeAM4Row && QuantizeARow) {
+        const size_t BlockSizeM = 4;
+        size_t BlockCountM = MlasDivRoundup(M, BlockSizeM);
+        MlasTrySimpleParallel(ThreadPool, BatchN * BlockCountM, [&](ptrdiff_t compute_idx) {
+            auto gemm_idx = compute_idx / BlockCountM;
+            auto m_idx = compute_idx % BlockCountM  * BlockSizeM;
+            const auto& data = DataParams[gemm_idx];
+            auto RowsTobeHandled = (M - m_idx) > 4 ? 4 : (M - m_idx);
+
+            if (RowsTobeHandled == 4) {
+                const float* ARowPtr = data.A + m_idx * data.lda;
+                std::byte* QuantARowPtr = static_cast<std::byte*>(Workspace) + gemm_idx * PerGemmWorkspaceStride + m_idx * QuantAStride;
+                QuantizeAM4Row(BlkLen, ARowPtr, K, QuantARowPtr);
+
+            } else {
+                while (RowsTobeHandled) {
+                    const float* ARowPtr = data.A + m_idx * data.lda;
+                    std::byte* QuantARowPtr = static_cast<std::byte*>(Workspace) + gemm_idx * PerGemmWorkspaceStride + m_idx * QuantAStride;
+                    QuantizeARow(BlkLen, ARowPtr, K, QuantARowPtr);
+                    RowsTobeHandled -= 1;
+                    m_idx += 1;
+                }
+            }
+
+        });
+
+      return ;
+    }
     if (QuantizeARow) {
         MlasTrySimpleParallel(ThreadPool, BatchN * M, [&](ptrdiff_t compute_idx) {
             auto gemm_idx = compute_idx / M;

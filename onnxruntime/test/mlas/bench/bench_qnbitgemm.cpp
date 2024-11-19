@@ -101,9 +101,16 @@ void RunQNBitGemmBenchmark(size_t BlkLen,
   }
 
   const auto scale_stride = ScaleType == ScaleFp16 ? 2 : 4;
+  const size_t BlockCountK = (K + BlkLen - 1) / BlkLen;
+  const size_t RoundupN = (N + 16 - 1) / 16 * 16;
+  size_t real_volume_in_byte = 0;
+  real_volume_in_byte += (RoundupN * BlockCountK * (BlkLen / 2 + scale_stride) + 4 * BlockCountK * (BlkLen + sizeof(float))) * (M / 4);
+  real_volume_in_byte += (RoundupN * BlockCountK * (BlkLen / 2 + scale_stride) + 1 * BlockCountK * (BlkLen + sizeof(float))) * (M % 4);
+
 
   state.counters["GB/s"] = benchmark::Counter(
-    uint64_t(state.iterations()) * (N * (K / 2 + K / BlkLen * scale_stride) + M * K * 4) / 1e09, benchmark::Counter::kIsRate);
+    uint64_t(state.iterations()) * real_volume_in_byte / 1e09, benchmark::Counter::kIsRate);
+    // uint64_t(state.iterations()) * (N * (K / 2 + K / BlkLen * scale_stride) + 4 * K) * (M / 4) / 1e09, benchmark::Counter::kIsRate);
 }
 
 template <typename AType, size_t BlkBitWidth>
@@ -127,15 +134,15 @@ static void QNBitGemmArgs(benchmark::internal::Benchmark* b) {
   b->ArgNames({"BlkLen", "M", "N", "K", "Threads", "Symmetric", "HasBias", "ComputeType"});
 
   b->ArgsProduct({
-      {64},                                     // BlkLen
-      {1},                                      // M
-      {4096, 11008},                            // N
-      {4096, 11008},                            // K
-      {4},                                      // Threads
-      {int64_t{true}},                          // Symmetric
-      {int64_t{false}},                         // HasBias
-      {int64_t{SQNBIT_CompInt8}},               // ComputeType
-      {int64_t{ScaleFp32}},                     // ScaleType
+      {32, 64, 128},                                     // BlkLen
+      {64},                                              // M
+      {4096, 11008},                                     // N
+      {4096, 11008},                                     // K
+      {4},                                               // Threads
+      {int64_t{true}},                                   // Symmetric
+      {int64_t{false}},                                  // HasBias
+      {int64_t{SQNBIT_CompInt8}},                        // ComputeType
+      {int64_t{ScaleFp32}},                              // ScaleType
   });
 }
 
