@@ -1720,9 +1720,9 @@ SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
                                  SAVE_RESULT_4x16
 
                                  :
-                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
-                                   [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                                   [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ BIAS ] "r"(bias),
+                                   [ ZPI ] "r"(zp_index)
                                  : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
                                    "s2", "s3", "s4", "s5", "s6");
 
@@ -1793,8 +1793,8 @@ SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
                     SAVE_RESULT_4x16
 
                     :
-                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                      [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
                     : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
                       "s4", "s5", "s6");
             }
@@ -1877,9 +1877,8 @@ SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
                                  SAVE_RESULT_4x16
 
                                  :
-                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
-                                   [ BIAS ] "r"(bias)
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                                   [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ BIAS ] "r"(bias)
                                  : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
                                    "s2", "s3", "s4", "s5", "s6");
 
@@ -1940,8 +1939,8 @@ SQ4BitGemmM4Kernel_CompInt8_ScaleFp16_Impl(size_t BlkLen,
                     SAVE_RESULT_4x16
 
                     :
-                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                      [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
                     : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
                       "s4", "s5", "s6");
             }
@@ -2087,9 +2086,9 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                                  SAVE_RESULT_4x16
 
                                  :
-                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
-                                   [ BIAS ] "r"(bias), [ ZPI ] "r"(zp_index)
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                                   [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ BIAS ] "r"(bias),
+                                   [ ZPI ] "r"(zp_index)
                                  : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
                                    "s2", "s3", "s4", "s5", "s6");
 
@@ -2160,8 +2159,8 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                     SAVE_RESULT_4x16
 
                     :
-                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                      [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ ZPI ] "r"(zp_index)
                     : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
                       "s4", "s5", "s6");
             }
@@ -2239,11 +2238,13 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                                  "addi               t3, t3, -1                  \n\t"
                                  "bnez               t3, BLOCK_COUNTK_LOOP%=     \n\t"
 
-                                 "RESULT_SAVE%=:                                 \n\t" SAVE_RESULT_4x16
+                                 "RESULT_SAVE%=:                                 \n\t"
+
+                                 SAVE_RESULT_4x16
+
                                  :
-                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                                   [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr),
-                                   [ BIAS ] "r"(bias)
+                                 : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                                   [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr), [ BIAS ] "r"(bias)
                                  : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1",
                                    "s2", "s3", "s4", "s5", "s6");
 
@@ -2306,8 +2307,8 @@ SQ4BitGemmM4Kernel_CompInt8_Impl(size_t BlkLen,
                     SAVE_RESULT_4x16
 
                     :
-                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr),
-                      [ LDC ] "r"(LDC), [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
+                    : [ INNER ] "r"(INNER), [ A ] "r"(QuantA), [ B ] "r"(QuantBDataPtr), [ LDC ] "r"(LDC),
+                      [ BlockCountK ] "r"(BlockCountK), [ C ] "r"(CPtr)
                     : "cc", "t0", "t1", "t2", "t3", "a1", "a2", "a3", "a4", "f1", "f2", "f3", "f4", "s1", "s2", "s3",
                       "s4", "s5", "s6");
             }
@@ -3317,8 +3318,7 @@ SQ4BitGemmKernel_CompInt8(size_t BlkLen,
     if (CountM >= 4) {
         if (QuantBZeroPoint != nullptr) {
             SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint,
-                                                               C, CountM, CountN, BlockCountK, Bias, ldc,
-                                                               ScaleStride);
+                                                               C, CountM, CountN, BlockCountK, Bias, ldc, ScaleStride);
         } else {
             SQ4BitGemmM4Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale,
                                                                 QuantBZeroPoint, C, CountM, CountN, BlockCountK, Bias,
@@ -3328,12 +3328,11 @@ SQ4BitGemmKernel_CompInt8(size_t BlkLen,
     } else {
         if (QuantBZeroPoint != nullptr) {
             SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<true>(BlkLen, QuantA, QuantBData, QuantBScale, QuantBZeroPoint,
-                                                               C, CountM, CountN, BlockCountK, Bias, ldc,
-                                                               ScaleStride);
+                                                               C, CountM, CountN, BlockCountK, Bias, ldc, ScaleStride);
         } else {
             SQ4BitGemmM1Kernel_CompInt8_DispatchOnBlkLen<false>(BlkLen, QuantA, QuantBData, QuantBScale,
                                                                 QuantBZeroPoint, C, CountM, CountN, BlockCountK, Bias,
-                                                               ldc, ScaleStride);
+                                                                ldc, ScaleStride);
         }
         return 1;
     }
