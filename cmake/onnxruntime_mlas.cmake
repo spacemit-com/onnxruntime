@@ -692,6 +692,7 @@ endif()
           ${MLAS_SRC_DIR}/riscv64/TanhKernelRVV.cpp
           ${MLAS_SRC_DIR}/riscv64/CastF16F32RVV.cpp
           ${MLAS_SRC_DIR}/riscv64/LogisticKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/MinMaxElementsRVV.cpp
           ${MLAS_SRC_DIR}/halfgemm_kernel_rvv.cpp
           ${MLAS_SRC_DIR}/riscv64/HalfGemmKernelRVV.cpp
           ${MLAS_SRC_DIR}/binary_rvv.cpp

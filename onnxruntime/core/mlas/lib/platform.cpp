@@ -687,6 +687,7 @@ Return Value:
     this->ComputeSumExpF32Kernel = MlasComputeSumExpF32Kernel_RVV;
     this->ComputeLogSoftmaxOutputF32Kernel = MlasComputeLogSoftmaxOutputF32Kernel_RVV;
     this->ComputeSoftmaxOutputF32Kernel = MlasComputeSoftmaxOutputF32Kernel_RVV;
+    this->ReduceMinimumMaximumF32Kernel = MlasReduceMinimumMaximumF32Kernel_RVV;
 
     this->CastF16ToF32Kernel = &MlasCastF16ToF32Kernel_RVV;
     this->CastF32ToF16Kernel = &MlasCastF32ToF16Kernel_RVV;
