@@ -632,7 +632,7 @@ SQ4BitGemm_CompInt8(
     const size_t packed_b_stride = ldb + k_blks * scale_stride;
     const std::byte* QuantBData = static_cast<const std::byte*>(DataParams->PackedQuantBData) + RangeStartN * packed_b_stride;
     if (DataParams->QuantBZeroPoint != nullptr) {
-        QuantBData = QuantBData + RangeStartN * k_blks * sizeof(uint8_t) / 2;
+        QuantBData = QuantBData + RangeStartN * k_blks * sizeof(uint8_t);
     }
 #else
     const size_t packed_b_stride = ldb;
@@ -671,7 +671,7 @@ SQ4BitGemm_CompInt8(
         if (GetMlasPlatform().QNBitGemmDispatch->SQ4BitGemmKernel_CompInt8WithScale != nullptr) {
             size_t RowsRemaining = RangeCountM;
             if (b_col_zp != nullptr) {
-                b_col = b_col + n * k_blks * sizeof(uint8_t) / 2;
+                b_col = b_col + n * k_blks * sizeof(uint8_t);
             }
             while (RowsRemaining > 0) {
                 const auto RowsHandled = GetMlasPlatform().QNBitGemmDispatch->SQ4BitGemmKernel_CompInt8WithScale(
