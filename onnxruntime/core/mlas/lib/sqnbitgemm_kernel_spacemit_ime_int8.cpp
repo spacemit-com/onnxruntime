@@ -153,7 +153,7 @@ SQ4BitGemmPackQuantBDataAndBlkSum(size_t N,
                                   MLAS_THREADPOOL* ThreadPool)
 {
     assert(BlkLen >= 16 && BlkLen % 16 == 0);
-    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::CompInt8);
+    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::SQNBIT_CompInt8);
     if (ScaleType == MLAS_QNBIT_GEMM_SCALE_TYPE::ScaleFp32) {
         SQ4BitGemmPackQuantBDataAndBlkSumImpl<float>(N, K, BlkLen, ComputeType, ScaleType, QuantBDataBegin,
                                                      QuantBScaleBegin, has_zp_input, QuantBZeroPointBegin,

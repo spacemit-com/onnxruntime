@@ -30,7 +30,7 @@ SQ4BitGemmPackQuantBData(size_t N,
     constexpr size_t BlkBitWidth = 4;
 
     assert(BlkLen >= 16 && BlkLen % 16 == 0);
-    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::CompFp32);
+    assert(ComputeType == MLAS_QNBIT_GEMM_COMPUTE_TYPE::SQNBIT_CompFp32);
     const size_t BlockCountK = MlasDivRoundup(K, BlkLen);
     const size_t BlkDataSize = MlasQNBitBlkDataSizeInBytes(BlkBitWidth, BlkLen);
     const size_t Iterations = N * BlockCountK;  // one iteration per block
