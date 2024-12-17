@@ -26,7 +26,7 @@ MlasComputeExpF32Kernel_RVV(const float* Input, float* Output, const size_t N)
         "LOOP_N%=:                                          \n\t"
         "vsetvli              t0, t2, e32, m8               \n\t"
         "vle32.v              v0, (%[SRC])                  \n\t"
-        "addi                 %[SRC], %[SRC], 256           \n\t"
+        "sh2add               %[SRC], t0, %[SRC]            \n\t"
         "vfmv.v.f             v8, %[RoundingBias]           \n\t"
         "vfmv.v.f             v24, %[poly_0]                \n\t"
         "sub                  t2, t2, t0                    \n\t"
@@ -58,7 +58,7 @@ MlasComputeExpF32Kernel_RVV(const float* Input, float* Output, const size_t N)
         "vfmadd.vv            v24, v0, v8                   \n\t"
         "vfmul.vv             v24, v24, v16                 \n\t"
         "vse32.v              v24, (%[DST])                 \n\t"
-        "addi                 %[DST], %[DST], 256           \n\t"
+        "sh2add               %[DST], t0, %[DST]            \n\t"
         "bnez                 t2, LOOP_N%=                  \n\t"
 
         : [ SRC ] "+r"(Input), [ DST ] "+r"(Output)
