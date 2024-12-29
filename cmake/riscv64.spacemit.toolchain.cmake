@@ -18,11 +18,11 @@ else()
 endif()
 
 if(NOT DEFINED CMAKE_CXX_FLAGS)
-    set(CMAKE_CXX_FLAGS "-march=rv64gcv_zfh")
+    set(CMAKE_CXX_FLAGS "-march=rv64gcv_zfh_zba")
 endif()
 
 if(NOT DEFINED CMAKE_CXX_FLAGS)
-    set(CMAKE_C_FLAGS "-march=rv64gcv_zfh")
+    set(CMAKE_C_FLAGS "-march=rv64gcv_zfh_zba")
 endif()
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
@@ -30,7 +30,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-set(CMAKE_C_FLAGS "-march=rv64gcv_zfh -latomic -mabi=lp64d ${CMAKE_C_FLAGS}")
-set(CMAKE_CXX_FLAGS "-march=rv64gcv_zfh -latomic -mabi=lp64d ${CXX_FLAGS}")
+set(CMAKE_C_FLAGS "-march=rv64gcv_zfh_zba -latomic -mabi=lp64d ${CMAKE_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "-march=rv64gcv_zfh_zba -latomic -mabi=lp64d ${CXX_FLAGS}")
 
 add_definitions(-D__fp16=_Float16)

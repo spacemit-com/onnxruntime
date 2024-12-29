@@ -1,8 +1,8 @@
 #!/bin/bash
-# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <config> <arch>
-
-export http_proxy=
-export https_proxy=
+# Copyright (c) 2023 SpacemiT. All rights reserved.
+# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config>, 
+# arch is x86 or rv64, config is Release or RelWithDebInfo or Debug
+# before run this script, please ensure that RISCV_ROOT_PATH is set to the path of riscv toolchain
 
 ARCH=$(uname -m)
 MATCH_ARCH=""
@@ -11,6 +11,9 @@ if [ "${ARCH}" = "x86_64" ]; then
     elif [ "${ARCH}" = "riscv64" ]; then
     MATCH_ARCH="rv64"
 fi
+
+# default ime spec is spacemit-ime1 for a60, spacemit-ime2 for a100(not implemented)
+SPACEMIT_IME_SPEC="spacemit-ime1"
 
 EXTERN_ARGS=
 
@@ -30,7 +33,7 @@ python3 ${1}/tools/ci_build/build.py --build_dir ${1}/build/Linux/${2} --config 
     --update --build --build_shared_lib --parallel 10 \
     --compile_no_warning_as_error --allow_running_as_root \
     --riscv_toolchain_root=${RISCV_ROOT_PATH} \
-    --riscv_ime_spec=spacemit-ime1 \
+    --riscv_ime_spec=${SPACEMIT_IME_SPEC} \
     --build_micro_benchmarks \
     --skip_submodule_sync \
     --${2} \
