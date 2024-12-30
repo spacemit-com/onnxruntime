@@ -546,14 +546,8 @@
 
 .endm
 
-
-#ifdef __APPLE__
-.globl _MlasSgemmKernel_8x16_Update
-_MlasSgemmKernel_8x16_Update:
-#else
 .globl MlasSgemmKernel_8x16_Update
 MlasSgemmKernel_8x16_Update:
-#endif
     preserve_caller_vec
 
     fmv.x.w T, f10
