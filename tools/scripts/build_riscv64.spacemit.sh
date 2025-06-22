@@ -1,8 +1,9 @@
 #!/bin/bash
 # Copyright (c) 2023 SpacemiT. All rights reserved.
-# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config>, 
+# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config>,
 # arch is x86 or rv64, config is Release or RelWithDebInfo or Debug
 # before run this script, please ensure that RISCV_ROOT_PATH is set to the path of riscv toolchain
+# https://archive.spacemit.com/toolchain/spacemit-toolchain-linux-glibc-x86_64-v1.1.2.tar.xz
 
 ARCH=$(uname -m)
 MATCH_ARCH=""

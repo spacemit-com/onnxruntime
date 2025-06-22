@@ -923,7 +923,11 @@ MlasQuantizeLinear<int8_t>(
         vfloat32m4_t vec_f32 = __riscv_vle32_v_f32m4(input_ptr, vl);
         vec_f32 = __riscv_vfmul_vf_f32m4(vec_f32, div_scale, vl);
         vec_f32 = __riscv_vfadd_vf_f32m4(vec_f32, ZeroPoint, vl);
+#if __riscv_v_intrinsic <= 11000
         vint8m1_t vec_out = __riscv_vnclip_wx_i8m1(__riscv_vfncvt_x_f_w_i16m2(vec_f32, vl), 0, vl);
+#else
+        vint8m1_t vec_out = __riscv_vnclip_wx_i8m1(__riscv_vfncvt_x_f_w_i16m2(vec_f32, vl), 0, 0, vl);
+#endif
         __riscv_vse8_v_i8m1(output_ptr, vec_out, vl);
     }
 }
@@ -950,7 +954,11 @@ MlasQuantizeLinear<uint8_t>(
         vec_f32 = __riscv_vfadd_vf_f32m4(vec_f32, ZeroPoint, vl);
         vint16m2_t vec_i16 = __riscv_vfncvt_x_f_w_i16m2(vec_f32, vl);
         vec_i16 = __riscv_vmax_vx_i16m2(vec_i16, 0, vl);
+#if __riscv_v_intrinsic <= 11000
         vuint8m1_t vec_out = __riscv_vnclipu_wx_u8m1(__riscv_vreinterpret_v_i16m2_u16m2(vec_i16), 0, vl);
+#else
+        vuint8m1_t vec_out = __riscv_vnclipu_wx_u8m1(__riscv_vreinterpret_v_i16m2_u16m2(vec_i16), 0, 0, vl);
+#endif
         __riscv_vse8_v_u8m1(output_ptr, vec_out, vl);
     }
 }
@@ -2078,11 +2086,19 @@ MlasRequantizeOutputImpl(
 
             if constexpr (std::is_signed<OutputType>::value) {
                 vint16m2_t I16Vector = __riscv_vfncvt_x_f_w_i16m2(FloatVector, vl);
+#if __riscv_v_intrinsic <= 11000
                 vint8m1_t OutVector = __riscv_vnclip_wx_i8m1(I16Vector, 0, vl);
+#else
+                vint8m1_t OutVector = __riscv_vnclip_wx_i8m1(I16Vector, 0, 0, vl);
+#endif
                 __riscv_vse8_v_i8m1(RowOutput, OutVector, vl);
             } else {
                 vuint16m2_t U16Vector = __riscv_vfncvt_xu_f_w_u16m2(FloatVector, vl);
+#if __riscv_v_intrinsic <= 11000
                 vuint8m1_t OutVector = __riscv_vnclipu_wx_u8m1(U16Vector, 0, vl);
+#else
+                vuint8m1_t OutVector = __riscv_vnclipu_wx_u8m1(U16Vector, 0, 0, vl);
+#endif
                 __riscv_vse8_v_u8m1(RowOutput, OutVector, vl);
             }
         }
