@@ -250,6 +250,7 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   bool verbose_logging_required = false;
   bool ep_context_enable = false;
   bool disable_ep_context_embed_mode = false;
+  bool override_output = false;
 
   int intra_thread_num = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
 
@@ -257,7 +258,7 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   bool pause = false;
   {
     int ch;
-    while ((ch = getopt(argc, argv, ORT_TSTR("Ac:hj:IMn:r:e:t:a:xvo:d:C:i:pzfb"))) != -1) {
+    while ((ch = getopt(argc, argv, ORT_TSTR("Ac:hj:IMn:r:e:t:a:xvo:X:d:C:i:pzfbO"))) != -1) {
       switch (ch) {
         case 'A':
           enable_cpu_mem_arena = false;
@@ -411,6 +412,10 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
           break;
         case 'f':
           ep_context_enable = true;
+          break;
+        case 'O':
+          fprintf(stdout, "Warning: Set override_output, please check the output!!!!!!!!\n");
+          override_output = true;
           break;
         case '?':
         case 'h':
@@ -1012,7 +1017,7 @@ select from 'TF8', 'TF16', 'UINT8', 'FLOAT', 'ITENSOR'. \n)");
               });
 
     auto tp = TestEnv::CreateThreadPool(Env::Default());
-    TestEnv test_env(env, sf, tp.get(), std::move(tests), stat, inference_mode);
+    TestEnv test_env(env, sf, tp.get(), std::move(tests), stat, inference_mode, override_output);
     Status st = test_env.Run(p_models, concurrent_session_runs, repeat_count);
     if (!st.IsOK()) {
       fprintf(stderr, "%s\n", st.ErrorMessage().c_str());

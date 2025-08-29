@@ -27,7 +27,7 @@ std::vector<std::shared_ptr<TestCaseResult>> TestCaseDriver::Run(const TestEnv& 
   std::vector<std::shared_ptr<TestCaseResult>> results;
   for (const auto& c : env.GetTests()) {
     auto result = TestCaseRequestContext::Run(env.GetThreadPool(),
-                                              *c, env.Env(), env.GetSessionOptions(), concurrent_runs, repeat_count, inference_mode);
+                                              *c, env.Env(), env.GetSessionOptions(), concurrent_runs, repeat_count, inference_mode, env.OverrideOutputRef());
     results.push_back(std::move(result));
   }
   return results;

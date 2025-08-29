@@ -1,3 +1,4 @@
+*onnxruntime*IExecutionProvider*
 *onnxruntime*Status*
 *onnxruntime*IDataTransfer*
 *onnxruntime*GetStackTrace*

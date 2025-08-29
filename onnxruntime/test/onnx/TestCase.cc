@@ -352,7 +352,7 @@ class OnnxTestCase : public ITestCase {
   std::string GetTestCaseVersion() const override { return model_info_->GetNominalOpsetVersion(); }
 
   void LoadTestData(size_t id, onnxruntime::test::HeapBuffer& b, std::unordered_map<std::string, Ort::Value>&,
-                    bool is_input) const override;
+                    bool is_input, std::unordered_map<std::string, std::string>& name_to_file_map) const override;
   void SaveResult(size_t id, std::vector<Ort::Value>& out_values) const override;
 };
 
@@ -496,7 +496,8 @@ static void LoadOptional(const PATH_STRING_TYPE& pb_file,
 
 void OnnxTestCase::LoadTestData(size_t id, onnxruntime::test::HeapBuffer& b,
                                 std::unordered_map<std::string, Ort::Value>& name_data_map,
-                                bool is_input) const {
+                                bool is_input,
+                                std::unordered_map<std::string, std::string>& name_to_file_map) const {
   if (id >= test_data_dirs_.size()) {
     ORT_THROW("index out of bound");
   }
@@ -556,6 +557,8 @@ void OnnxTestCase::LoadTestData(size_t id, onnxruntime::test::HeapBuffer& b,
     if (!value_info_proto->has_type()) {
       ORT_THROW("Model ", is_input ? "input " : "output ", i, " is missing type info");
     }
+
+    name_to_file_map[value_info_proto->name()] = test_data_pb_files[i];
 
     if (value_info_proto->type().has_tensor_type()) {
       ONNX_NAMESPACE::TensorProto test_pb;

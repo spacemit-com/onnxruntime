@@ -25,13 +25,10 @@ BUILD_DIR=${1}/build/Linux/${2}
 EXTERN_ARGS="${EXTERN_ARGS} \
     --cmake_extra_defines \
     onnxruntime_DEBUG_NODE_INPUTS_OUTPUTS=ON \
-    CMAKE_INSTALL_PREFIX=${BUILD_DIR}/${3}/installed"
-
-# For Clang
-# EXTERN_ARGS="${EXTERN_ARGS} CMAKE_CXX_COMPILER=clang++ CMAKE_C_COMPILER=clang"
+    CMAKE_INSTALL_PREFIX=installed"
 
 python3 ${1}/tools/ci_build/build.py --build_dir ${BUILD_DIR} --config ${3} \
-    --update --build --build_shared_lib --parallel 10 \
+    --update --build --build_shared_lib --parallel 20 \
     --compile_no_warning_as_error --allow_running_as_root \
     --riscv_toolchain_root=${RISCV_ROOT_PATH} \
     --build_micro_benchmarks \
