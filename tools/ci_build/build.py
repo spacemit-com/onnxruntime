@@ -523,16 +523,27 @@ def generate_build_tree(
     if args.minimal_build is not None:
         add_default_definition(cmake_extra_defines, "ONNX_MINIMAL_BUILD", "ON")
     if args.rv64:
-        add_default_definition(cmake_extra_defines, "onnxruntime_CROSS_COMPILING", "ON")
-        if not args.riscv_toolchain_root:
-            raise BuildError("The --riscv_toolchain_root option is required to build for riscv64.")
-        if not args.skip_tests and not args.riscv_qemu_path:
-            raise BuildError("The --riscv_qemu_path option is required for testing riscv64.")
+        if platform.machine() == "riscv64":
+            print("Building for riscv64 on the host")
+        else:
+            add_default_definition(cmake_extra_defines, "onnxruntime_CROSS_COMPILING", "ON")
+            if not args.riscv_toolchain_root:
+                raise BuildError("The --riscv_toolchain_root option is required to build for riscv64.")
+            if not args.skip_tests and not args.riscv_qemu_path:
+                raise BuildError("The --riscv_qemu_path option is required for testing riscv64.")
+
+        spacemit_cmake_toolchain_file = "riscv64.spacemit.toolchain.cmake"
+        if args.riscv_use_clang:
+            spacemit_cmake_toolchain_file = "riscv64.spacemit.clang.toolchain.cmake"
+        elif args.build_ohos:
+            spacemit_cmake_toolchain_file = "riscv64.oh.spacemit.toolchain.cmake"
+
+        rv_toolchain_file = os.path.join(source_dir, "cmake", spacemit_cmake_toolchain_file)
 
         cmake_args += [
             "-DRISCV_TOOLCHAIN_ROOT:PATH=" + args.riscv_toolchain_root,
             "-DRISCV_QEMU_PATH:PATH=" + args.riscv_qemu_path,
-            "-DCMAKE_TOOLCHAIN_FILE=" + os.path.join(source_dir, "cmake", "riscv64.toolchain.cmake"),
+            "-DCMAKE_TOOLCHAIN_FILE=" + rv_toolchain_file,
         ]
     emscripten_cmake_toolchain_file = None
     emsdk_dir = None
