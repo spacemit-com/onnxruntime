@@ -79,6 +79,9 @@ Abstract:
 #if defined(MLAS_TARGET_WASM_SIMD)
 #include <wasm_simd128.h>
 #endif
+#if defined(__riscv) && defined(__riscv_v) && defined(__riscv_v_intrinsic)
+#include <riscv_vector.h>
+#endif
 #endif
 
 //
@@ -1091,6 +1094,20 @@ extern "C" {
     MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32KernelNeon;
     MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16KernelNeon;
 #endif
+
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasComputeExpF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasErfKernel_RVV;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL MlasReduceMaximumF32Kernel_RVV;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL MlasComputeSumExpF32Kernel_RVV;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeLogSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasTanhKernel_RVV;
+    MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32Kernel_RVV;
+    MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasLogisticKernel_RVV;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL MlasReduceMinimumMaximumF32Kernel_RVV;
+#endif
 }
 
 //
@@ -1333,6 +1350,17 @@ struct MLAS_PLATFORM {
     MLAS_CONV_PREPARE_FLOAT_OVERRIDE* MlasConvPrepareOverride = nullptr;
     MLAS_CONV_FLOAT_OVERRIDE* MlasConvOverride = nullptr;
 
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ComputeExpF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ErfKernelRoutine;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL* ReduceMaximumF32Kernel;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL* ComputeSumExpF32Kernel;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeLogSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * TanhKernelRoutine;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * LogisticKernelRoutine;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL* ReduceMinimumMaximumF32Kernel;
+#endif
 #if defined(MLAS_TARGET_AMD64_IX86) || defined(MLAS_TARGET_POWER) || defined(MLAS_TARGET_S390X)
     MLAS_GEMM_FLOAT_KERNEL* GemmFloatKernel;
 #endif

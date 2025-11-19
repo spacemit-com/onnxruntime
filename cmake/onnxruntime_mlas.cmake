@@ -396,6 +396,8 @@ else()
           set(LOONGARCH64 TRUE)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^s390x$")
           set(S390X TRUE)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^riscv64.*")
+          set(RISCV64 TRUE)
         endif()
     endif()
 
@@ -822,6 +824,44 @@ endif()
         if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
           set(MLAS_SOURCE_IS_NOT_SET 0)
         endif()
+    endif()
+    if(RISCV64 AND MLAS_SOURCE_IS_NOT_SET)
+      enable_language(ASM)
+      set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -march=rv64gcv_zfh_zvfh_zba_zicbop_zihintpause")
+      set(CMAKE_REQUIRED_FLAGS "-march=rv64gcv_zfh_zvfh_zba_zicbop_zihintpause")
+      check_c_source_compiles("int main() {_Float16 f = 1.0; return 0;}" SPINE_COMPILER_SUPPORT_RISCV_DEFINE_FLOAT16)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vsetvli t0, zero, e8, m1,tu,mu\");}" SPINE_COMPILER_SUPPORT_RISCV_DEFINE_RVV)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_IME1)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1, i4\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S4)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1, i8\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S8)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vfwmadot v2, v0, v1, fp16\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFWMADOT_FP16)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vfmadot v2, v0, v1, fp32\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_FP32)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot.hp v2, v0, v1, v0, 0, i4\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_S4)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot.hp v2, v0, v1, v0, 0, i8\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_S8)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot1 v2, v0, v1\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOTN)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vpack.vv v2, v0, v1, 2\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VPACK)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vnspack.vv v2, v0, v1, 2\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VNPACK)
+      unset(CMAKE_REQUIRED_FLAGS)
+
+      set(mlas_platform_srcs
+          ${mlas_platform_srcs}
+          ${MLAS_SRC_DIR}/riscv64/ErfKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/ExpKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/SoftmaxKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/TanhKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/CastF16F32RVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/LogisticKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/MinMaxElementsRVV.cpp
+          )
+      file(GLOB_RECURSE mlas_platform_srcs_generic
+          "${MLAS_SRC_DIR}/scalar/*.cpp")
+      set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${mlas_platform_srcs_generic}
+          )
+      if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
+        set(MLAS_SOURCE_IS_NOT_SET 0)
+      endif()
     endif()
     if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH AND MLAS_SOURCE_IS_NOT_SET)
         file(GLOB_RECURSE mlas_platform_srcs
