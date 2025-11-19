@@ -1137,9 +1137,18 @@ Return Value:
 
 --*/
 {
+#if defined(MLAS_TARGET_RISCV64)
+    constexpr size_t PanelASize = UpAlignSize(MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_STRIDEK * sizeof(float));
+    constexpr size_t PanelBSize = UpAlignSize(MLAS_SGEMM_STRIDEN * MLAS_SGEMM_STRIDEK * sizeof(float));
+    MlasThreadedBufAlloc(PanelASize + PanelBSize);
+
+    uint8_t* tls_buffer = ThreadedBufHolder.get();
+    float* PanelA = (float*)tls_buffer;
+    float* PanelB = (float*)(tls_buffer + PanelASize);
+#else
     float PanelA[MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_STRIDEK];
     MLAS_DECLSPEC_ALIGN(float PanelB[MLAS_SGEMM_STRIDEN * MLAS_SGEMM_STRIDEK], 16 * sizeof(float));
-
+#endif
     //
     // Handle the special case of K equals zero. Apply the beta multiplier to
     // the output matrix and exit.
@@ -1380,8 +1389,15 @@ Return Value:
 
 --*/
 {
-    float PanelA[MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_PACKED_STRIDEK];
+#if defined(MLAS_TARGET_RISCV64)
+    constexpr size_t PanelASize = UpAlignSize(MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_PACKED_STRIDEK * sizeof(float));
+    MlasThreadedBufAlloc(PanelASize);
 
+    uint8_t* tls_buffer = ThreadedBufHolder.get();
+    float* PanelA = (float*)tls_buffer;
+#else
+    float PanelA[MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_PACKED_STRIDEK];
+#endif
     //
     // Step through each slice of matrix B along the N dimension.
     //
