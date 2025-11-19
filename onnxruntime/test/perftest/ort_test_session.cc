@@ -29,6 +29,8 @@
 #include "core/providers/dml/dml_session_options_config_keys.h"
 #endif
 
+#include "test/util/test_spacemit_ep.h"
+
 #ifdef _WIN32
 #define strdup _strdup
 #endif
@@ -678,6 +680,33 @@ select from 'TF8', 'TF16', 'UINT8', 'FLOAT', 'ITENSOR'. \n)");
 #else
     ORT_THROW("VitisAI is not supported in this build\n");
 #endif
+  } else if (provider_name_ == onnxruntime::kSpaceMITExecutionProvider) {
+    std::cout << "using SpaceMITExecutionProvider" << std::endl;
+    std::unordered_map<std::string, std::string> spacemit_ep_provider_options;
+#ifdef _MSC_VER
+    std::string option_string = ToUTF8String(performance_test_config.run_config.ep_runtime_config_string);
+#else
+    std::string option_string = performance_test_config.run_config.ep_runtime_config_string;
+#endif
+    std::istringstream ss(option_string);
+    std::string token;
+    while (ss >> token) {
+      if (token == "") {
+        continue;
+      }
+      auto pos = token.find("|");
+      if (pos == std::string::npos || pos == 0 || pos == token.length()) {
+        ORT_THROW("[ERROR] [SpacemiT EP] Use a '|' to separate the key and value for the run-time option you are trying to use.\n");
+      }
+
+      std::string key(token.substr(0, pos));
+      std::string value(token.substr(pos + 1));
+      if (key.find("SPACEMIT") == 0) {
+        std::cout << "setting " << key << " : " << value << std::endl;
+        spacemit_ep_provider_options[key] = value;
+      }
+    }
+    onnxruntime::test::InitSpaceMITExecutionProvider(session_options, spacemit_ep_provider_options);
   } else if (!provider_name_.empty() &&
              provider_name_ != onnxruntime::kCpuExecutionProvider &&
              provider_name_ != onnxruntime::kOpenVINOExecutionProvider) {
