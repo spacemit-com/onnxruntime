@@ -461,7 +461,8 @@ py::object AddTensorAsPyObj(const OrtValue& val, const DataTransferManager* data
 static std::shared_ptr<onnxruntime::IExecutionProviderFactory> LoadExecutionProviderFactory(
     const std::string& ep_shared_lib_path,
     const ProviderOptions& provider_options = {},
-    const std::string& entry_symbol_name = "GetProvider") {
+    const std::string& entry_symbol_name = "GetProvider",
+    const SessionOptions* sess = nullptr) {
   void* handle;
   const auto path_str = ToPathString(ep_shared_lib_path);
   auto error = Env::Default().LoadDynamicLibrary(path_str, false, &handle);
@@ -469,11 +470,17 @@ static std::shared_ptr<onnxruntime::IExecutionProviderFactory> LoadExecutionProv
     throw std::runtime_error(error.ErrorMessage());
   }
 
-  Provider* (*PGetProvider)();
-  OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&PGetProvider));
+  if (sess == nullptr) {
+    Provider* (*PGetProvider)();
+    OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&PGetProvider));
 
-  Provider* provider = PGetProvider();
-  return provider->CreateExecutionProviderFactory(&provider_options);
+    Provider* provider = PGetProvider();
+    return provider->CreateExecutionProviderFactory(&provider_options);
+  } else {
+    std::shared_ptr<IExecutionProviderFactory> (*get_ep_factory)(const void*, const void*);
+    OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&get_ep_factory));
+    return get_ep_factory(&provider_options, &session_options);
+  }
 }
 
 #if defined(USE_CUDA) || defined(USE_CUDA_PROVIDER_INTERFACE)
@@ -1265,6 +1272,7 @@ static std::shared_ptr<IExecutionProviderFactory> CreateExecutionProviderFactory
             provider_options.insert(option);
           }
         }
+        auto* session_options_ptr = type == kSpaceMITExecutionProvider ? &session_options : nullptr;
         return LoadExecutionProviderFactory(shared_lib_path_it->second, provider_options, entry_symbol);
       }
     }
@@ -1892,7 +1900,7 @@ void addObjectMethods(py::module& m, ExecutionProviderRegistrationFn ep_registra
 
   py::class_<OrtSyncStream> py_sync_stream(m, "OrtSyncStream",
                                            R"pbdoc(Represents a synchronization stream for model inference.)pbdoc");
-  py_sync_stream.def("get_handle", [](OrtSyncStream* stream) -> uintptr_t { 
+  py_sync_stream.def("get_handle", [](OrtSyncStream* stream) -> uintptr_t {
       Ort::UnownedSyncStream ort_stream(stream);
       return reinterpret_cast<uintptr_t>(ort_stream.GetHandle()); }, R"pbdoc(SyncStream handle that can be converted to a string and added to SessionOptions)pbdoc");
 
@@ -2006,7 +2014,7 @@ for model inference.)pbdoc");
       .def_property_readonly("allocator_type", [](const OrtMemoryInfo* mem_info) -> OrtAllocatorType { return mem_info->alloc_type; }, R"pbdoc(Allocator type)pbdoc")
       .def_property_readonly("device_mem_type", [](const OrtMemoryInfo* mem_info) -> OrtDeviceMemoryType {
               auto mem_type = mem_info->device.MemType();
-              return (mem_type == OrtDevice::MemType::DEFAULT) ? 
+              return (mem_type == OrtDevice::MemType::DEFAULT) ?
                   OrtDeviceMemoryType_DEFAULT: OrtDeviceMemoryType_HOST_ACCESSIBLE ; }, R"pbdoc(Device memory type (Device or Host accessible).)pbdoc")
       .def_property_readonly("device_vendor_id", [](const OrtMemoryInfo* mem_info) -> uint32_t { return mem_info->device.Vendor(); });
 
@@ -2748,7 +2756,7 @@ including arg name, arg type (contains both type and shape).)pbdoc")
             auto res = sess->GetSessionHandle()->GetModelMetadata();
             OrtPybindThrowIfError(res.first);
             return *(res.second); }, py::return_value_policy::reference_internal)
-      .def_property_readonly("input_meminfos", [](const PyInferenceSession* sess) -> py::list { 
+      .def_property_readonly("input_meminfos", [](const PyInferenceSession* sess) -> py::list {
           Ort::ConstSession session(reinterpret_cast<const OrtSession*>(sess->GetSessionHandle()));
           auto inputs_mem_info = session.GetMemoryInfoForInputs();
           py::list result;
@@ -2757,7 +2765,7 @@ including arg name, arg type (contains both type and shape).)pbdoc")
             result.append(py::cast(p_info, py::return_value_policy::reference));
           }
           return result; })
-      .def_property_readonly("output_meminfos", [](const PyInferenceSession* sess) -> py::list { 
+      .def_property_readonly("output_meminfos", [](const PyInferenceSession* sess) -> py::list {
           Ort::ConstSession session(reinterpret_cast<const OrtSession*>(sess->GetSessionHandle()));
           auto outputs_mem_info = session.GetMemoryInfoForOutputs();
           py::list result;
