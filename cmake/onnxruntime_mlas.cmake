@@ -859,6 +859,22 @@ endif()
             ${mlas_platform_srcs}
             ${mlas_platform_srcs_generic}
           )
+      if(SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_IME1)
+        set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/qgemm_kernel_spacemit_ime1.cpp
+        )
+        add_compile_definitions(onnxruntime_mlas PRIVATE RISCV_SPACEMIT_IME1=1)
+      endif()
+
+      if(SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S4)
+        set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/qgemm_kernel_spacemit_ime2.cpp
+        )
+        add_compile_definitions(onnxruntime_mlas PRIVATE RISCV_SPACEMIT_IME2=1)
+      endif()
+
       if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
         set(MLAS_SOURCE_IS_NOT_SET 0)
       endif()

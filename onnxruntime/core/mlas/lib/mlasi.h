@@ -348,8 +348,11 @@ static_assert(sizeof(MLAS_FP16) == FP16_SIZE);
 #define MLAS_HGEMM_STRIDEN_THREAD_ALIGN             32
 #define MLAS_SGEMM_STRIDEN_THREAD_ALIGN             16
 #define MLAS_DGEMM_STRIDEN_THREAD_ALIGN             8
+#if defined(RISCV_SPACEMIT_IME2)
+#define MLAS_QGEMM_STRIDEN_THREAD_ALIGN             32
+#else
 #define MLAS_QGEMM_STRIDEN_THREAD_ALIGN             16
-
+#endif
 //
 // Define the prototypes of the platform optimized routines.
 //
@@ -1190,7 +1193,15 @@ extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmU8X8DispatchWasmRelaxedSimd;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmQuantDispatchDefault;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchPOWER10;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchZVECTOR;
+#ifdef RISCV_SPACEMIT_IME1
+// Ime1
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmX8X8DispatchSpacemiTIme1_BASE;
+#endif
 
+#ifdef RISCV_SPACEMIT_IME2
+//  Ime2
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmX8X8DispatchSpacemiTIme2_BASE;
+#endif
 #if defined(MLAS_TARGET_WASM_RELAXED_SIMD)
 extern bool HasUSDot();
 #endif
