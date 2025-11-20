@@ -37,7 +37,6 @@ extern_symbols = set()
 if args.extern_symbols_file is not None and os.path.exists(args.extern_symbols_file):
     with open(args.extern_symbols_file) as file:
         for extern_sym in file.readlines():
-            print(extern_sym)
             extern_symbols.add(extern_sym.strip())
 
 symbols = sorted(symbols)

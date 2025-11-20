@@ -24,7 +24,7 @@ MlasComputeExpF32Kernel_RVV(const float* Input, float* Output, const size_t N)
     __asm__ volatile(
         "addi                 t2, %[N], 0                   \n\t"
         "LOOP_N%=:                                          \n\t"
-        "vsetvli              t0, t2, e32, m8               \n\t"
+        "vsetvli              t0, t2, e32, m8, tu, mu       \n\t"
         "vle32.v              v0, (%[SRC])                  \n\t"
         "sh2add               %[SRC], t0, %[SRC]            \n\t"
         "vfmv.v.f             v8, %[RoundingBias]           \n\t"

@@ -57,13 +57,13 @@ MlasComputeSumExpF32Kernel_RVV(const float* Input, float* Output, const size_t D
             "mv                   s2, %[DST]                                  \n\t"
 
             /* 2.0 Compute exp() and accumulate and store to cache_buffer */
-            "vsetvli              t0, zero, e32, m4                           \n\t"
+            "vsetvli              t0, zero, e32, m4, tu, mu                   \n\t"
             "vxor.vv              v16, v8, v8                                 \n\t"
             "vxor.vv              v0, v8, v8                                  \n\t"
 
             ".align 4                                                         \n\t"
             "_EXPACC_LEN_LPST:                                                \n\t"
-            "vsetvli              t0, t3, e32, m4                             \n\t"
+            "vsetvli              t0, t3, e32, m4, tu, mu                     \n\t"
 
             "vle32.v              v0, (s1)                                    \n\t"
             "sh2add               s1, t0, s1                                  \n\t"
@@ -125,7 +125,7 @@ MlasComputeSumExpF32Kernel_RVV(const float* Input, float* Output, const size_t D
 
             "_EXPACC_LEN_LPND:                                                \n\t"
 
-            "vsetvli              t0, zero, e32, m4                           \n\t"
+            "vsetvli              t0, zero, e32, m4, tu, mu                   \n\t"
             "vxor.vv              v24, v8, v8                                 \n\t"
             "vfredosum.vs         v24, v16, v24                               \n\t"
             "vfmv.f.s             %[RTN], v24                                 \n\t"  // ft2 = sum(exp( ))
@@ -146,13 +146,13 @@ MlasComputeSumExpF32Kernel_RVV(const float* Input, float* Output, const size_t D
             "mv                   s2, %[DST]                                  \n\t"
 
             /* 2.0 Compute exp() and accumulate and store to cache_buffer */
-            "vsetvli              t0, zero, e32, m4                           \n\t"
+            "vsetvli              t0, zero, e32, m4, tu, mu                   \n\t"
             "vxor.vv              v16, v8, v8                                 \n\t"
             "vxor.vv              v0, v8, v8                                  \n\t"
 
             ".align 4                                                         \n\t"
             "_ACCNST_LEN_LPST:                                                \n\t"
-            "vsetvli              t0, t3, e32, m4                             \n\t"
+            "vsetvli              t0, t3, e32, m4, tu, mu                     \n\t"
 
             "vle32.v              v0, (s1)                                    \n\t"
             "sh2add               s1, t0, s1                                  \n\t"
@@ -212,7 +212,7 @@ MlasComputeSumExpF32Kernel_RVV(const float* Input, float* Output, const size_t D
 
             "_ACCNST_LEN_LPND:                                                \n\t"
 
-            "vsetvli              t0, zero, e32, m4                           \n\t"
+            "vsetvli              t0, zero, e32, m4, tu, mu                   \n\t"
             "vxor.vv              v24, v8, v8                                 \n\t"
             "vfredosum.vs         v24, v16, v24                               \n\t"
             "vfmv.f.s             %[RTN], v24                                 \n\t"  // ft2 = sum(exp( ))
@@ -228,6 +228,7 @@ MlasComputeSumExpF32Kernel_RVV(const float* Input, float* Output, const size_t D
     }
     return Accumulator;
 }
+
 void
 MlasComputeLogSoftmaxOutputF32Kernel_RVV(const float* Input, float* Output, size_t N, const float* Parameters)
 {
@@ -246,7 +247,7 @@ MlasComputeLogSoftmaxOutputF32Kernel_RVV(const float* Input, float* Output, size
 
         ".align 4                                                       \n\t"
         "_LOG_LEN_LPST:                                                 \n\t"
-        "vsetvli              t0, t3, e32, m8                           \n\t"
+        "vsetvli              t0, t3, e32, m8, tu, mu                   \n\t"
         "vle32.v              v0, (s1)                                  \n\t"
         "sh2add               s1, t0, s1                                \n\t"
         "vfadd.vf             v16, v0, %[NEG_MAX]                       \n\t"
@@ -275,7 +276,7 @@ MlasComputeSoftmaxOutputF32Kernel_RVV(float* Output, size_t N, const float* Para
 
         ".align 4                                                       \n\t"
         "_MUL_LEN_LPST:                                                 \n\t"
-        "vsetvli              t0, t3, e32, m8                           \n\t"
+        "vsetvli              t0, t3, e32, m8, tu, mu                   \n\t"
         "vle32.v              v0, (s1)                                  \n\t"
         "sh2add               s1, t0, s1                                \n\t"
         "vfmul.vf             v16, v0, %[SCL]                           \n\t"

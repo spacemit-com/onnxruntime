@@ -19,8 +19,8 @@ set(RISCV_ROOT_PATH ${RISCV_ROOT_PATH} CACHE STRING "root path to riscv toolchai
 set(CMAKE_C_COMPILER ${RISCV_ROOT_PATH}/bin/clang)
 set(CMAKE_CXX_COMPILER ${RISCV_ROOT_PATH}/bin/clang++)
 set(CMAKE_STRIP ${RISCV_ROOT_PATH}/bin/llvm-strip)
-set(CMAKE_FIND_ROOT_PATH "${RISCV_ROOT_PATH}/riscv64-unknown-linux-gnu")
-set(CMAKE_SYSROOT "${RISCV_ROOT_PATH}/sysroot")
+set(CMAKE_FIND_ROOT_PATH ${RISCV_ROOT_PATH}/sysroot)
+set(CMAKE_SYSROOT ${RISCV_ROOT_PATH}/sysroot)
 endif()
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)

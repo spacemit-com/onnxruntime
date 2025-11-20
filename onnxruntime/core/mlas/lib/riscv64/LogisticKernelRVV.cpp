@@ -59,7 +59,7 @@ Return Value:
 {
     __asm__ volatile(
         "LOOP%=:                                \t\n"
-        "vsetvli  t0,       %[n],     e32,      m1\t\n"
+        "vsetvli  t0,       %[n],     e32,      m1, tu, mu\t\n"
         "sub      %[n],     %[n],     t0        \t\n"
         "slli     t0,       t0,       2         \t\n"
 

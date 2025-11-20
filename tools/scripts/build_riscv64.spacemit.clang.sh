@@ -1,5 +1,4 @@
 #!/bin/bash
-# Copyright (c) 2023 SpacemiT. All rights reserved.
 # bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config>,
 # arch is x86 or rv64, config is Release or RelWithDebInfo or Debug
 # before run this script, please ensure that RISCV_ROOT_PATH is set to the path of riscv toolchain
@@ -20,7 +19,7 @@ if [ "${2}" = "${MATCH_ARCH}" ]; then
     EXTERN_ARGS="${EXTERN_ARGS} --enable_pybind --build_wheel"
 fi
 
-BUILD_DIR=${1}/build/Linux/${2}
+BUILD_DIR=${1}/build/Linux/${2}-clang
 
 EXTERN_ARGS="${EXTERN_ARGS} \
     --cmake_extra_defines \
@@ -31,7 +30,6 @@ python3 ${1}/tools/ci_build/build.py --build_dir ${BUILD_DIR} --config ${3} \
     --update --build --build_shared_lib --parallel 20 \
     --compile_no_warning_as_error --allow_running_as_root \
     --riscv_toolchain_root=${RISCV_ROOT_PATH} \
-    --riscv_ime_spec=${IME_SPEC} \
     --build_micro_benchmarks \
     --skip_submodule_sync \
     --use_mimalloc \

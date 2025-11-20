@@ -48,7 +48,7 @@ MlasTanhKernel_RVV(const float* Input, float* Output, size_t N)
         ".align 4                                                         \n\t"
         "_TANH_LEN_LPST:                                                  \n\t"
 
-        "vsetvli              t0, t3, e32, m8                             \n\t"
+        "vsetvli              t0, t3, e32, m8, tu, mu                     \n\t"
 
         "vle32.v              v0, (s1)                                    \n\t"
         "sh2add               s1, t0, s1                                  \n\t"
