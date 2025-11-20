@@ -67,7 +67,7 @@ const char* ElementTypeToString(MLDataType type) {
   return DataTypeImpl::ToString(type);
 }
 
-#if defined(__aarch64__) && defined(__linux__)
+#if (defined(__aarch64__) || defined(__riscv)) && defined(__linux__)
 template <typename T>
 std::pair<COMPARE_RESULT, std::string> CheckCosineSimilarity(const Tensor& outvalue, const Tensor& expected_value) {
   const size_t tensor_size = static_cast<size_t>(expected_value.Shape().Size());
@@ -296,7 +296,7 @@ std::pair<COMPARE_RESULT, std::string> CompareTwoTensors(const Tensor& outvalue,
     return std::make_pair(COMPARE_RESULT::SHAPE_MISMATCH, oss.str());
   }
 
-#if defined(__aarch64__) && defined(__linux__)
+#if (defined(__aarch64__) || defined(__riscv)) && defined(__linux__)
   if (isnan(per_sample_tolerance) || isnan(per_sample_tolerance)) {
     if (outvalue.IsDataType<float>()) {
       return CheckCosineSimilarity<float>(outvalue, expected_tensor);
