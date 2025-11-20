@@ -351,6 +351,7 @@ if (CPUINFO_SUPPORTED)
   # if this is a wasm build with xnnpack (only type of wasm build where cpuinfo is involved)
   # we do not use cpuinfo in ORT code, so don't define CPUINFO_SUPPORTED.
   if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten" AND onnxruntime_USE_XNNPACK)
+  elseif (onnxruntime_target_platform MATCHES "^(riscv64)$")
   else()
     add_compile_definitions(CPUINFO_SUPPORTED)
   endif()
