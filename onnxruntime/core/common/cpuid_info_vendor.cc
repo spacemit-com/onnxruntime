@@ -202,7 +202,7 @@ constexpr std::array kCpuVendorInfos{
     CpuVendorInfo{cpuinfo_vendor_apple, "Apple", 0x106B},
     CpuVendorInfo{cpuinfo_vendor_arm, "ARM", 0x13B5},
     CpuVendorInfo{cpuinfo_vendor_spacemit, "SpacemiT", 0x0710},
-
+    CpuVendorInfo{cpuinfo_vendor_ibm, "IBM", 0x1014},
     // TODO add more as needed
 };
 
@@ -232,6 +232,9 @@ void CPUIDInfo::VendorInfoInit() {
       }
     }
 #endif  // defined(CPUINFO_SUPPORTED)
+#if defined(_AIX)
+    result = cpuinfo_vendor_ibm;
+#endif
     return result;
   }();
 
