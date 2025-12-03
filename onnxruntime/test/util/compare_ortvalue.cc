@@ -74,9 +74,9 @@ std::pair<COMPARE_RESULT, std::string> CheckCosineSimilarity(const Tensor& outva
   const T* expected_output = expected_value.Data<T>();
   const T* real_output = outvalue.Data<T>();
   std::pair<COMPARE_RESULT, std::string> res = std::make_pair(COMPARE_RESULT::SUCCESS, "");
-  const T cosine_similarity_threshold = 0.99f;
+  const double cosine_similarity_threshold = 0.999f;
 
-  T dot = 0.0f, denom_a = 0.0f, denom_b = 0.0f;
+  double dot = 0.0f, denom_a = 0.0f, denom_b = 0.0f;
   for (size_t i = 0u; i < tensor_size; ++i) {
     if (isnan(expected_output[i]) && isnan(real_output[i]))
       continue;
@@ -87,7 +87,7 @@ std::pair<COMPARE_RESULT, std::string> CheckCosineSimilarity(const Tensor& outva
     denom_b += real_output[i] * real_output[i];
   }
 
-  T cos_factor = abs(dot / (sqrt(denom_a) * sqrt(denom_b)));
+  double cos_factor = abs(dot / (sqrt(denom_a) * sqrt(denom_b)));
   if (cos_factor < cosine_similarity_threshold) {
     res.first = COMPARE_RESULT::RESULT_DIFFERS;
     std::ostringstream oss;
@@ -300,6 +300,8 @@ std::pair<COMPARE_RESULT, std::string> CompareTwoTensors(const Tensor& outvalue,
   if (isnan(per_sample_tolerance) || isnan(per_sample_tolerance)) {
     if (outvalue.IsDataType<float>()) {
       return CheckCosineSimilarity<float>(outvalue, expected_tensor);
+    } else if (outvalue.IsDataType<MLFloat16>()) {
+      return CheckCosineSimilarity<MLFloat16>(outvalue, expected_tensor);
     } else if (outvalue.IsDataType<double>()) {
       return CheckCosineSimilarity<double>(outvalue, expected_tensor);
     } else if (outvalue.IsDataType<uint8_t>()) {
