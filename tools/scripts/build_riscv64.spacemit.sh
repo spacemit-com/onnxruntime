@@ -26,14 +26,18 @@ EXTERN_ARGS="${EXTERN_ARGS} \
     onnxruntime_DEBUG_NODE_INPUTS_OUTPUTS=ON \
     CMAKE_INSTALL_PREFIX=installed"
 
+BUILD_ARGS=
+if [ "${MATCH_ARCH}" = "rv64" ]; then
+    BUILD_ARGS="--${2} --riscv_toolchain_root=${RISCV_ROOT_PATH}"
+fi
+
 python3 ${1}/tools/ci_build/build.py --build_dir ${BUILD_DIR} --config ${3} \
     --update --build --build_shared_lib --parallel 20 \
     --compile_no_warning_as_error --allow_running_as_root \
-    --riscv_toolchain_root=${RISCV_ROOT_PATH} \
+    ${BUILD_ARGS} \
     --build_micro_benchmarks \
     --skip_submodule_sync \
     --use_mimalloc \
-    --${2} \
     --skip_tests \
     ${EXTERN_ARGS}
 

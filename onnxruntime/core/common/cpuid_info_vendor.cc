@@ -192,7 +192,9 @@ struct CpuVendorInfo {
 };
 
 constexpr auto kUnknownCpuVendorInfo = CpuVendorInfo{cpuinfo_vendor_unknown, "unknown", 0x0000};
+#ifdef __riscv
 constexpr auto kSpacemiTCpuVendorInfo = CpuVendorInfo{cpuinfo_vendor_spacemit, "spacemit", 0x0710};
+#endif
 
 constexpr std::array kCpuVendorInfos{
     CpuVendorInfo{cpuinfo_vendor_amd, "AMD", 0x1022},
@@ -201,7 +203,9 @@ constexpr std::array kCpuVendorInfos{
     CpuVendorInfo{cpuinfo_vendor_nvidia, "Nvidia", 0x10DE},
     CpuVendorInfo{cpuinfo_vendor_apple, "Apple", 0x106B},
     CpuVendorInfo{cpuinfo_vendor_arm, "ARM", 0x13B5},
+#ifdef __riscv
     CpuVendorInfo{cpuinfo_vendor_spacemit, "SpacemiT", 0x0710},
+#endif
     CpuVendorInfo{cpuinfo_vendor_ibm, "IBM", 0x1014},
     // TODO add more as needed
 };

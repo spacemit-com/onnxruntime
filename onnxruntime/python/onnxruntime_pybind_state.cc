@@ -479,7 +479,7 @@ static std::shared_ptr<onnxruntime::IExecutionProviderFactory> LoadExecutionProv
   } else {
     std::shared_ptr<IExecutionProviderFactory> (*get_ep_factory)(const void*, const void*);
     OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&get_ep_factory));
-    return get_ep_factory(&provider_options, &session_options);
+    return get_ep_factory(&provider_options, sess);
   }
 }
 
