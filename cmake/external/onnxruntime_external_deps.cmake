@@ -164,7 +164,7 @@ if(NOT ONNX_CUSTOM_PROTOC_EXECUTABLE AND NOT onnxruntime_USE_VCPKG)
       endif()
     endif()
 
-    if(NOT ONNX_CUSTOM_PROTOC_EXECUTABLE)
+    if(NOT ONNX_CUSTOM_PROTOC_EXECUTABLE AND NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(riscv)")
       message(FATAL_ERROR "ONNX_CUSTOM_PROTOC_EXECUTABLE must be set to cross-compile.")
     endif()
   endif()

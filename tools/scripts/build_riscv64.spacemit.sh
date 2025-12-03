@@ -15,7 +15,7 @@ fi
 EXTERN_ARGS=
 
 if [ "${2}" = "${MATCH_ARCH}" ]; then
-    echo "BUILD ORT With Pyhon"
+    echo "BUILD ORT With Python"
     EXTERN_ARGS="${EXTERN_ARGS} --enable_pybind --build_wheel"
 fi
 
