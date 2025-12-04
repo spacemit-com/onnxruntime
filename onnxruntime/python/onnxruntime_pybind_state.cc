@@ -1273,7 +1273,7 @@ static std::shared_ptr<IExecutionProviderFactory> CreateExecutionProviderFactory
           }
         }
         auto* session_options_ptr = type == kSpaceMITExecutionProvider ? &session_options : nullptr;
-        return LoadExecutionProviderFactory(shared_lib_path_it->second, provider_options, entry_symbol);
+        return LoadExecutionProviderFactory(shared_lib_path_it->second, provider_options, entry_symbol, session_options_ptr);
       }
     }
     // unknown provider
