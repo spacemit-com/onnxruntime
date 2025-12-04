@@ -18,7 +18,7 @@ BUILD_ARGS="--build_micro_benchmarks"
 if [ "${2}" = "${MATCH_ARCH}" ]; then
     echo "BUILD ORT With Python"
     EXTERN_ARGS="${EXTERN_ARGS} --enable_pybind --build_wheel"
-    if [ "${ARCH}" = "riscv64" ]; then
+    if [ "${2}" = "rv64" ]; then
         BUILD_ARGS="--skip_onnx_tests"
     fi
 fi
@@ -30,7 +30,7 @@ EXTERN_ARGS="${EXTERN_ARGS} \
     onnxruntime_DEBUG_NODE_INPUTS_OUTPUTS=ON \
     CMAKE_INSTALL_PREFIX=installed"
 
-if [ "${MATCH_ARCH}" = "rv64" ]; then
+if [ "${2}" = "rv64" ]; then
     BUILD_ARGS="${BUILD_ARGS} --${2} --riscv_toolchain_root=${RISCV_ROOT_PATH}"
 fi
 
