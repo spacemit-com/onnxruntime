@@ -648,6 +648,7 @@ MlasGemm(
 {
     MlasGemmBatch(Shape, &DataParams, 1, ThreadPool);
 }
+
 /**
  * @brief Parameters that define the shape of a dynamically quantized GEMM operation.
  *
@@ -660,6 +661,7 @@ struct MLAS_GEMM_DYN_QUANT_SHAPE_PARAMS {
     size_t N = 0;                  /**< Column size of matrix B */
     size_t K = 0;                  /**< Column size of matrix A and Row size of matrix B */
 };
+
 /**
  * @brief Parameters that define the data buffers and layout for a dynamic quant GEMM.
  *
@@ -694,6 +696,14 @@ MlasDynamicQGemm (
     MlasDynamicQGemmBatch(Shape, DataParams, 1, ThreadPool);
 }
 
+/**
+ * @brief Determines whether a dynamic quantized GEMM implementation is available on the current platform.
+ *
+ * MlasDynamicQGemm() and MlasDynamicQGemmBatch() should only be called if this function returns true.
+ */
+bool
+MLASCALL
+MlasIsDynamicQGemmAvailable();
 
 //
 // Symmetric QGEMM has limited buffer overrun.
