@@ -30,6 +30,10 @@
 *onnxruntime*lora*
 *onnxruntime*profiling*
 *onnxruntime*functors*
+*onnxruntime*SessionOptions*
+*onnxruntime*Float16*
+*onnxruntime*ExternalDataInfo*
+*onnxruntime*DataTransferManager*
 *OrtApis*
 *OrtEnv*
 *OrtSessionOptions*

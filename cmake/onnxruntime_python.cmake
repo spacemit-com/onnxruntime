@@ -195,9 +195,11 @@ if(WIN32)
 endif()
 
 if (onnxruntime_BUILD_SHARED_LIB)
+  if (onnxruntime_ENABLE_DLPACK)
+    target_sources(onnxruntime_pybind11_state PRIVATE "${ONNXRUNTIME_ROOT}/core/dlpack/dlpack_converter.cc")
+  endif()
   target_link_libraries(onnxruntime_pybind11_state PRIVATE
     ${onnxruntime_libs}
-    onnxruntime_flatbuffers
     ${pybind11_lib}
     Python::NumPy
   )
