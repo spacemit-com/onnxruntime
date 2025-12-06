@@ -79,7 +79,6 @@ with open(args.output_source, "w") as file:
             "vitisai",
             "winml",
             "cuda",
-            "rocm",
             "migraphx",
             "qnn",
             "snpe",
