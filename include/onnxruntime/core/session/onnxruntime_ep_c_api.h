@@ -585,11 +585,11 @@ struct OrtKernelImpl {
    *                      the application for the session/environment (e.g., via CreateAndRegisterAllocator[V2]
    *                      or RegisterAllocator), or an allocator on the OrtEpDevice (read-only or default) otherwise.
    *                      The allocator remains valid throughout the lifetime of the OrtKernelImpl instance.
-   * \param[in] prepacked_weight_cache May be NULL. If not NULL, the kernel may choose to share a packed weight by
-   *                                   first storing it in the OrtSharedPrePackedWeightCache instance and then
-   *                                   receiving the actual shared weight data in the call to
-   *                                   OrtKernelImpl::SetSharedPrePackedWeight(). See the above description for
-   *                                   "sharing mode".
+   * \param[in] prepacked_weights_cache May be NULL. If not NULL, the kernel may choose to share a packed weight by
+   *                                    first storing it in the OrtSharedPrePackedWeightCache instance and then
+   *                                    receiving the actual shared weight data in the call to
+   *                                    OrtKernelImpl::SetSharedPrePackedWeight(). See the above description for
+   *                                    "sharing mode".
    * \param[out] is_packed Output parameter that the implementation sets to true if the kernel packed the tensor data.
    *
    * \snippet{doc} snippets.dox OrtStatus Return Value
@@ -1276,7 +1276,7 @@ struct OrtEpApi {
    *
    * \note Subsequent calls with the same OrtSharedPrePackedWeightCache instance release and replace the old data.
    *
-   * \param[in] prepacked_weight_cache The OrtSharedPrePackedWeightCache instance.
+   * \param[in] this_ptr The OrtKernelImpl instance.
    * \param[in] buffer_data_ptrs An array of buffer data pointers that collectively hold the pre-packed data for a
    *                             single shared weight. Note that sometimes a single weight may have multiple pre-packed
    *                             buffers and it is up to the kernel implementation to determine how to split the data
@@ -1293,157 +1293,6 @@ struct OrtEpApi {
                   _In_ OrtSharedPrePackedWeightCache* prepacked_weight_cache,
                   _In_reads_(num_buffers) void** buffer_data_ptrs, _In_reads_(num_buffers) size_t* buffer_data_sizes,
                   _In_ size_t num_buffers);
-
-  /** \brief Get the OrtEp instance to which the node is assigned from the OrtKernelInfo.
-   *
-   * \note Used within OrtKernelImpl implementations to obtain a reference to the OrtEp.
-   *
-   * \param[in] info The ::OrtKernelInfo instance.
-   * \param[out] ep Output parameter set to the OrtEp instance associated with the OrtKernelInfo.
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   * \since Version 1.24
-   */
-  ORT_API2_STATUS(KernelInfo_GetEp, _In_ const OrtKernelInfo* info, _Outptr_ const OrtEp** ep);
-
-  /** \brief Set the details of an OrtDeviceEpIncompatibilityDetails instance.
-   *
-   * Used by execution provider factories to set incompatibility details in their
-   * GetHardwareDeviceIncompatibilityDetails implementation. ORT creates and initializes the object
-   * before passing it to the EP, so calling this function is optional. The EP uses this function
-   * to set incompatibility information when the device is not compatible.
-   *
-   * \param[in,out] details The OrtDeviceEpIncompatibilityDetails instance to update.
-   * \param[in] reasons_bitmask Bitmask of OrtDeviceEpIncompatibilityReason values. (0 = no incompatibility).
-   * \param[in] error_code Optional EP-specific error code (0 = no error).
-   * \param[in] notes Optional human-readable notes. Can be null.
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   *
-   * \since Version 1.24.
-   */
-  ORT_API2_STATUS(DeviceEpIncompatibilityDetails_SetDetails, _Inout_ OrtDeviceEpIncompatibilityDetails* details,
-                  _In_ uint32_t reasons_bitmask,
-                  _In_ int32_t error_code,
-                  _In_opt_z_ const char* notes);
-
-  /** \brief Creates an OrtKernelImpl instance for an If operator.
-   *
-   * Control flow operators require access to ORT session internals to orchestrate subgraph operations.
-   * This function allows an EP to create a properly configured OrtKernelImpl with access to ORT internals that
-   * the EP can add to its kernel registry.
-   *
-   * An EP is required to create an OrtKernelDef that keeps input[0] ('cond') on the CPU (i.e., OrtMemTypeCPUInput)
-   * as this input is used by CPU logic. The output should remain on the device (i.e., OrtMemTypeDefault), which is
-   * the default setting, to avoid copying to/from CPU.
-   *
-   * Example kernel definition (CXX API):
-   *     Ort::KernelDef kernel_def = Ort::KernelDefBuilder()
-   *                                     .SetDomain("").SetOperatorType("If").SetSinceVersion(21, 22)
-   *                                     .SetExecutionProvider("MyEp")
-   *                                     .SetInputMemType(0, OrtMemTypeCPUInput) // 'cond' on CPU
-   *                                     .SetOutputMemType(0, OrtMemTypeDefault) // output on EP device
-   *                                     .AddTypeConstraint("B", ...)
-   *                                     .AddTypeConstraint("V", ...).Build();
-   *
-   * \param[in] kernel_info The ::OrtKernelInfo instance for an If node. This function returns error ORT_FAIL
-   *                        if the opset version specified by `kernel_info` is unsupported.
-   * \param[out] kernel_out Output parameter set to the OrtKernelImpl instance for the If node.
-   *                        Must be released via ::ReleaseKernelImpl, unless ownership is transferred
-   *                        to ORT (see OrtKernelCreateFunc and ::KernelRegistry_AddKernel()).
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   * \since Version 1.24
-   */
-  ORT_API2_STATUS(CreateIfKernel, _In_ const OrtKernelInfo* kernel_info, _Outptr_ OrtKernelImpl** kernel_out);
-
-  /** \brief Creates an OrtKernelImpl instance for a Loop operator.
-   *
-   * Control flow operators require access to ORT session internals to orchestrate subgraph operations.
-   * This function allows an EP to create a properly configured OrtKernelImpl with access to ORT internals that
-   * the EP can add to its kernel registry.
-   *
-   * An EP is required to create an OrtKernelDef that keeps input[0] ('M') and input[1] ('cond') on the CPU
-   * (i.e., OrtMemTypeCPUInput) as these inputs are used by CPU logic. Input[2] ('v_initial') and the output should
-   * remain on the device (i.e., OrtMemTypeDefault), which is the default setting, to avoid copying to/from CPU.
-   *
-   * Example kernel definition (CXX API):
-   *     Ort::KernelDef kernel_def = Ort::KernelDefBuilder()
-   *                                     .SetDomain("").SetOperatorType("Loop").SetSinceVersion(21, 22)
-   *                                     .SetExecutionProvider("MyEp")
-   *                                     .SetInputMemType(0, OrtMemTypeCPUInput) // 'M' on CPU
-   *                                     .SetInputMemType(1, OrtMemTypeCPUInput) // 'cond' on CPU
-   *                                     .SetInputMemType(2, OrtMemTypeDefault) // 'v_initial' on EP device
-   *                                     .SetOutputMemType(0, OrtMemTypeDefault) // output on EP device
-   *                                     .AddTypeConstraint("I", ...)
-   *                                     .AddTypeConstraint("B", ...)
-   *                                     .AddTypeConstraint("V", ...).Build();
-   *
-   * \param[in] kernel_info The ::OrtKernelInfo instance for a Loop node. This function returns error ORT_FAIL
-   *                        if the opset version specified by `kernel_info` is unsupported.
-   * \param[in] helper A OrtLoopKernelHelper instance that contains helper functions that ORT calls during kernel
-   *                   execution to operate on tensors allocated with the EP's device memory.
-   *                   ORT will call OrtLoopKernelHelper::Release() to release the helper and its resources.
-   * \param[out] kernel_out Output parameter set to the OrtKernelImpl instance for the Loop node.
-   *                        Must be released via ::ReleaseKernelImpl, unless ownership is transferred
-   *                        to ORT (see OrtKernelCreateFunc and ::KernelRegistry_AddKernel()).
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   * \since Version 1.24
-   */
-  ORT_API2_STATUS(CreateLoopKernel, _In_ const OrtKernelInfo* kernel_info, _In_ OrtLoopKernelHelper* helper,
-                  _Outptr_ OrtKernelImpl** kernel_out);
-
-  /** \brief Creates an OrtKernelImpl instance for a Scan operator. Does not support opset versions older than 9.
-   *
-   * Control flow operators require access to ORT session internals to orchestrate subgraph operations.
-   * This function allows an EP to create a properly configured OrtKernelImpl with access to ORT internals that
-   * the EP can add to its kernel registry.
-   *
-   * It is recommended that an EP create an OrtKernelDef that keeps the inputs and outputs on the EP's
-   * device (i.e., OrtMemTypeDefault), which is the default setting, to avoid copying to/from CPU.
-   *
-   * Example kernel definition (CXX API):
-   *     Ort::KernelDef kernel_def = Ort::KernelDefBuilder()
-   *                                     .SetDomain("").SetOperatorType("Scan").SetSinceVersion(21, 22)
-   *                                     .SetExecutionProvider("MyEp")
-   *                                     .SetInputMemType(0, OrtMemTypeDefault) // input[0] on EP device
-   *                                     .SetOutputMemType(0, OrtMemTypeDefault) // output[0] on EP device
-   *                                     .AddTypeConstraint("V", ...).Build();
-   *
-   * \param[in] kernel_info The ::OrtKernelInfo instance for a Scan node. This function returns error ORT_FAIL
-   *                        if the opset version specified by `kernel_info` is unsupported.
-   * \param[in] helper A OrtScanKernelHelper instance that contains helper functions that ORT calls during kernel
-   *                   execution to operate on tensors allocated with the EP's device memory.
-   *                   ORT will call OrtScanKernelHelper::Release() to release the helper and its resources.
-   * \param[out] kernel_out Output parameter set to the OrtKernelImpl instance for the Scan node.
-   *                        Must be released via ::ReleaseKernelImpl, unless ownership is transferred
-   *                        to ORT (see OrtKernelCreateFunc and ::KernelRegistry_AddKernel()).
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   * \since Version 1.24
-   */
-  ORT_API2_STATUS(CreateScanKernel, _In_ const OrtKernelInfo* kernel_info, _In_ OrtScanKernelHelper* helper,
-                  _Outptr_ OrtKernelImpl** kernel_out);
-
-  ORT_CLASS_RELEASE(KernelImpl);
-
-  /** \brief Gets a new OrtKeyValuePairs instance containing a copy of all configuration entries set on the environment.
-   *
-   * \note An application provides environment-level configuration options for execution provider libraries by
-   *       using keys with the prefix 'ep_factory.<ep_name>.'. Ex: the key 'ep_factory.my_ep.some_ep_key' represents
-   *       a key named 'some_ep_key' that is meant to be consumed by an execution provider named 'my_ep'. Refer to
-   *       the specific execution provider's documentation for valid keys and values.
-   *
-   * \note Refer to onnxruntime_env_config_keys.h for common configuration entry keys and their supported values.
-   *
-   * \param[out] out Output parameter set to the OrtKeyValuePairs instance containing all configuration entries.
-   *                 Must be released via OrtApi::ReleaseKeyValuePairs.
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   * \since Version 1.24
-   */
-  ORT_API2_STATUS(GetEnvConfigEntries, _Outptr_ OrtKeyValuePairs** config_entries);
 };
 
 /**
