@@ -78,6 +78,7 @@ struct WebGpuContextConfig {
       0
 #endif
   };
+  bool enable_pix_capture{false};
 };
 
 class WebGpuContextFactory {

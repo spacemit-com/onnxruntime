@@ -161,6 +161,15 @@ void WebGpuContext::Initialize(const WebGpuContextConfig& config) {
     } else {
       query_type_ = TimestampQueryType::None;
     }
+    if (config.enable_pix_capture) {
+#if defined(ENABLE_PIX_FOR_WEBGPU_EP)
+      // set pix frame generator
+      pix_frame_generator_ = std::make_unique<WebGpuPIXFrameGenerator>(instance_,
+                                                                       Device());
+#else
+    ORT_THROW("Support PIX capture requires extra build flags (--enable_pix_capture)");
+#endif  // ENABLE_PIX_FOR_WEBGPU_EP
+    }
   });
 }
 

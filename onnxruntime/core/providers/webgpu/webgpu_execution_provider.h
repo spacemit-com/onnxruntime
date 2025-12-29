@@ -33,7 +33,6 @@ struct CapturedCommandInfo;
 struct WebGpuExecutionProviderConfig {
   DataLayout data_layout{DataLayout::NHWC};  // preferred layout is NHWC by default
   bool enable_graph_capture{false};          // graph capture feature is disabled by default
-  bool enable_pix_capture{false};            // PIX capture is disabled by default
   std::vector<std::string> force_cpu_node_names{};
 };
 
