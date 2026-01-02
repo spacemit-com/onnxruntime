@@ -63,18 +63,13 @@ namespace cuda {
 
 // Concat new to past in present. Supports past BSNH or past BNSH
 template <typename T>
-Status LaunchConcatNewToPastKVHelper(GroupQueryAttentionParameters& parameters,
-                                     GroupQueryAttentionData<T>& data,
-                                     const void* new_key,
-                                     const void* new_value,
-                                     cudaStream_t stream,
-                                     const int max_threads_per_block,
-                                     const bool past_only = false,
-                                     const T* cos_cache = nullptr,
-                                     const T* sin_cache = nullptr,
-                                     const int rotary_dim = 0,
-                                     const int64_t* position_ids = nullptr,
-                                     const bool interleaved = false) {
+Status LaunchConcatNewToPastKV(GroupQueryAttentionParameters& parameters,
+                               GroupQueryAttentionData<T>& data,
+                               const void* new_key,
+                               const void* new_value,
+                               cudaStream_t stream,
+                               const int max_threads_per_block,
+                               const bool past_only = false) {
   const int batch_size = parameters.batch_size;
   const int kv_sequence_length = parameters.sequence_length;
   const int past_sequence_length = parameters.seqlen_past_kv_cache;
@@ -244,8 +239,7 @@ __global__ void UngroupLarge(const T* kv_in,
 }
 
 // Ungroup kv or present kv for use in Memory Efficient kernel. If present kv is not null and is BNSH, transposes it.
-template <typename T>
-Status LaunchUngroup(const GroupQueryAttentionParameters& parameters,
+Status LaunchUngroup(GroupQueryAttentionParameters& parameters,
                      float2* k_buff, float2* v_buff,
                      const float2* k_og, const float2* v_og,
                      const int buff_seqlen, const int og_seqlen,
