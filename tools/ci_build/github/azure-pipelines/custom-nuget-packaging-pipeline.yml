@@ -135,6 +135,13 @@ extends:
         parameters:
           IsReleaseBuild: ${{ parameters.IsReleaseBuild }}
           DoEsrp: true
+          ArtifactName: 'drop-nuget-qnn-arm64'
+          # Add --use_webgpu to enable WebGPU
+          StageName: 'OnnxRuntime_QNN_Nuget_Win_Arm64'
+          build_config: 'RelWithDebInfo'
+          PublishArchive: true
+          PublishNugetToFeed: false
+          AdditionalBuildArgs: '--caller_framework WinAI'
 
       - template: templates/mac-cpu-packaging-pipeline.yml
         parameters:
