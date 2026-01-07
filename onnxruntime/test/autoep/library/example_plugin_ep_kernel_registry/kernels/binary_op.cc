@@ -27,7 +27,7 @@ ONNX_OPERATOR_KERNEL_EX(
     BinaryOp)
 
 BinaryOp::BinaryOp(Ort::ConstKernelInfo info, void* state, PrivateTag)
-    : OrtKernelImpl{},  // Initialize all OrtKernelImpl members to NULL/zero
+    : OrtKernelImpl{},  // Initialize all OrtKernelImpl functions to NULL
       info_{info},
       data_transfer_impl_{reinterpret_cast<OrtDataTransferImpl*>(state)} {
   ort_version_supported = ORT_API_VERSION;
@@ -41,7 +41,8 @@ BinaryOp::BinaryOp(Ort::ConstKernelInfo info, void* state, PrivateTag)
 }
 
 /*static*/
-OrtStatus* BinaryOp::CreateKernelImpl(const OrtKernelInfo* info, void* state, /*out*/ OrtKernelImpl*& result) noexcept {
+OrtStatus* BinaryOp::Create(const OrtKernelInfo* info, void* state,
+                            /*out*/ std::unique_ptr<BinaryOp>& result) noexcept {
   EXCEPTION_TO_RETURNED_STATUS_BEGIN
   Ort::ConstKernelInfo kernel_info(info);
 
@@ -57,8 +58,7 @@ OrtStatus* BinaryOp::CreateKernelImpl(const OrtKernelInfo* info, void* state, /*
     return Ort::GetApi().CreateStatus(ORT_EP_FAIL, oss.str().c_str());
   }
 
-  auto binary_op = std::make_unique<BinaryOp>(kernel_info, state, PrivateTag{});
-  result = binary_op.release();
+  result = std::make_unique<BinaryOp>(kernel_info, state, PrivateTag{});
   return nullptr;
   EXCEPTION_TO_RETURNED_STATUS_END
 }
