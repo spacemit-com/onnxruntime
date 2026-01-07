@@ -58,37 +58,64 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
     // https://github.com/kokkos/kokkos-kernels/issues/349
     // https://github.com/HazyResearch/flash-attention/issues/21
 
-    const int num_m_block = (params.seqlen_q + Kernel_traits::kBlockM - 1) / Kernel_traits::kBlockM;
-    dim3 grid(num_m_block, params.b, params.h);
-    const bool is_even_MN = params.cu_seqlens_q == nullptr && params.cu_seqlens_k == nullptr && params.seqlen_k % Kernel_traits::kBlockN == 0 && params.seqlen_q % Kernel_traits::kBlockM == 0;
-    const bool is_even_K = params.d == Kernel_traits::kHeadDim;
-    const bool return_softmax = params.p_ptr != nullptr;
+  const int num_m_block = (params.seqlen_q + Kernel_traits::kBlockM - 1) / Kernel_traits::kBlockM;
+  dim3 grid(num_m_block, params.b, params.h);
+  const bool is_even_MN = params.cu_seqlens_q == nullptr && params.cu_seqlens_k == nullptr && params.seqlen_k % Kernel_traits::kBlockN == 0 && params.seqlen_q % Kernel_traits::kBlockM == 0;
+  const bool is_even_K = params.d == Kernel_traits::kHeadDim;
+  BOOL_SWITCH(is_even_MN, IsEvenMNConst, [&] {
+    EVENK_SWITCH(is_even_K, IsEvenKConst, [&] {
+      LOCAL_SWITCH((params.window_size_left >= 0 || params.window_size_right >= 0) && !Is_causal, Is_local, [&] {
+        ALIBI_SWITCH(params.alibi_slopes_ptr != nullptr, Has_alibi, [&] {
+          SOFTCAP_SWITCH(params.softcap > 0.0, Is_softcap, [&] {
+            // Will only return softmax if dropout, to reduce compilation time.
+            // If not IsEvenKConst, we also set IsEvenMNConst to false to reduce number of templates.
+            // If head dim > 128, set IsEvenMNConst to false to reduce number of templates
+            // If Is_local, set Is_causal to false
+            auto kernel = &flash_fwd_kernel < Kernel_traits, Is_causal, Is_local && !Is_causal, Has_alibi, IsEvenMNConst && IsEvenKConst && !Is_local && Kernel_traits::kHeadDim <= 128, IsEvenKConst, Is_softcap, false > ;
+            if (smem_size >= 48 * 1024) {
+              cudaFuncSetAttribute(
+                  kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(smem_size));
+            }
+            // int ctas_per_sm;
+            // cudaError status_ = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+            //     &ctas_per_sm, kernel, Kernel_traits::kNThreads, smem_size);
+            //  printf("smem_size = %d, CTAs per SM = %d\n", int(smem_size), ctas_per_sm);
+            kernel<<<grid, Kernel_traits::kNThreads, static_cast<int>(smem_size), stream>>>(params);
+          });
+        });
+      });
+    });
+  });
+}
+
+template <typename Kernel_traits>
+void run_flash_splitkv_fwd(Flash_fwd_params& params, cudaStream_t stream) {
+  static_assert(!Kernel_traits::Is_Q_in_regs, "SplitKV implementation does not support Is_Q_in_regs");
+  static_assert(!Kernel_traits::Share_Q_K_smem, "SplitKV implementation does not support Share_Q_K_smem");
+  constexpr size_t smem_size = Kernel_traits::kSmemSize;
+  const int num_m_block = (params.seqlen_q + Kernel_traits::kBlockM - 1) / Kernel_traits::kBlockM;
+  dim3 grid(num_m_block, params.num_splits > 1 ? params.num_splits : params.b, params.num_splits > 1 ? params.b * params.h : params.h);
+  const bool is_even_MN = params.cu_seqlens_q == nullptr && params.cu_seqlens_k == nullptr && params.seqlen_k % Kernel_traits::kBlockN == 0 && params.seqlen_q % Kernel_traits::kBlockM == 0;
+  const bool is_even_K = params.d == Kernel_traits::kHeadDim;
+  BOOL_SWITCH(params.is_causal, Is_causal, [&] {
     BOOL_SWITCH(is_even_MN, IsEvenMNConst, [&] {
-        EVENK_SWITCH(is_even_K, IsEvenKConst, [&] {
-            LOCAL_SWITCH((params.window_size_left >= 0 || params.window_size_right >= 0) && !Is_causal, Is_local, [&] {
-                BOOL_SWITCH(return_softmax, ReturnSoftmaxConst, [&] {
-                    ALIBI_SWITCH(params.alibi_slopes_ptr != nullptr, Has_alibi, [&] {
-                        SOFTCAP_SWITCH(params.softcap > 0.0, Is_softcap, [&] {
-                            // Will only return softmax if dropout, to reduce compilation time.
-                            // If not IsEvenKConst, we also set IsEvenMNConst to false to reduce number of templates.
-                            // If return_softmax, set IsEvenMNConst to false to reduce number of templates
-                            // If head dim > 128, set IsEvenMNConst to false to reduce number of templates
-                            // If Is_local, set Is_causal to false
-                            auto kernel = &flash_fwd_kernel<Kernel_traits, Is_causal, Is_local && !Is_causal, Has_alibi, IsEvenMNConst && IsEvenKConst && !Is_local && !Has_alibi && !ReturnSoftmaxConst && Kernel_traits::kHeadDim <= 128, IsEvenKConst && !ReturnSoftmaxConst && !Has_alibi, Is_softcap, false>;
-                            // auto kernel = &flash_fwd_kernel<Kernel_traits, false, Is_causal, false, false, true, true, false>;
-                            // printf(\"IsEvenMNConst = %d, IsEvenKConst = %d, Is_local = %d, Is_causal = %d, ReturnSoftmaxConst = %d\\n\", int(IsEvenMNConst), int(IsEvenKConst), int(Is_local), int(Is_causal), int(ReturnSoftmaxConst));
-                            // auto kernel = &flash_fwd_kernel<Kernel_traits, false, Is_causal, false, true, true, false>;
-                            if (smem_size >= 48 * 1024) {
-                                CUDA_CALL_THROW(cudaFuncSetAttribute(
-                                    kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
-                            }
-                            // int ctas_per_sm;
-                            // cudaError status_ = cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-                            //     &ctas_per_sm, kernel, Kernel_traits::kNThreads, smem_size);
-                            // printf("smem_size = %d, CTAs per SM = %d\n", int(smem_size), ctas_per_sm);
-                            kernel<<<grid, Kernel_traits::kNThreads, smem_size, stream>>>(params);
-                        });
-                    });
+      EVENK_SWITCH(is_even_K, IsEvenKConst, [&] {
+        LOCAL_SWITCH((params.window_size_left >= 0 || params.window_size_right >= 0) && !Is_causal, Is_Local_Const, [&] {
+          BOOL_SWITCH(params.num_splits > 1, SplitConst, [&] {
+            BOOL_SWITCH(params.knew_ptr != nullptr, Append_KV_Const, [&] {
+              ALIBI_SWITCH(params.alibi_slopes_ptr != nullptr, Has_alibi, [&] {
+                SOFTCAP_SWITCH(params.softcap > 0.0, Is_softcap, [&] {
+                  // If Append_KV_Const, then we must have seqlen_offsets, which means cu_seqlens_k != nullptr.
+                  // If not IsEvenKConst, we also set IsEvenMNConst to false to reduce number of templates.
+                  // If Is_Local_Const, set Is_causal to false
+                  auto kernel = &flash_fwd_splitkv_kernel < Kernel_traits, Is_causal, Is_Local_Const && !Is_causal, Has_alibi,
+                  IsEvenMNConst && !Append_KV_Const && IsEvenKConst && !Is_Local_Const && Kernel_traits::kHeadDim <= 128,
+                  IsEvenKConst, Is_softcap, SplitConst, Append_KV_Const >;
+                  if (smem_size >= 48 * 1024) {
+                    cudaFuncSetAttribute(
+                        kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(smem_size));
+                  }
+                  kernel<<<grid, Kernel_traits::kNThreads, static_cast<int>(smem_size), stream>>>(params);
                 });
             });
         });

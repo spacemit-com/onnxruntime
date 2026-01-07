@@ -191,7 +191,10 @@ Status GroupQueryAttention<T>::ComputeInternal(OpKernelContext* context) const {
                                                                  parameters.head_size,
                                                                  parameters.num_heads,
                                                                  parameters.kv_num_heads);
-  data.use_flash_attention_fast_decode = use_flash_attention && !disable_flash_decode_ && !parameters.is_first_prompt && parameters.kv_share_buffer;
+  // Allocate buffers
+  size_t softmax_lse_bytes = 0;
+  size_t softmax_lse_accum_bytes = 0;
+  size_t out_accum_bytes = 0;
   if (use_flash_attention) {
     data.use_flash_attention = true;
     data.use_memory_efficient_attention = false;
