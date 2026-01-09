@@ -38,7 +38,6 @@
 #include "core/session/allocator_adapters.h"
 #include "core/session/compile_api.h"
 #include "core/session/environment.h"
-#include "core/session/ep_graph_assignment_info.h"
 #include "core/session/interop_api.h"
 #include "core/session/plugin_ep/ep_api.h"
 #include "core/session/plugin_ep/ep_library_internal.h"
@@ -4496,6 +4495,9 @@ static constexpr OrtApi ort_api_1_to_24 = {
     &OrtApis::KernelInfo_GetOperatorDomain,
     &OrtApis::KernelInfo_GetOperatorType,
     &OrtApis::KernelInfo_GetOperatorSinceVersion,
+
+    &OrtApis::GetInteropApi,
+    &OrtApis::SessionGetEpDeviceForOutputs,
 };
 
 // OrtApiBase can never change as there is no way to know what version of OrtApiBase is returned by OrtGetApiBase.

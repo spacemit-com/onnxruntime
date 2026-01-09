@@ -19,12 +19,14 @@
 struct ExampleExternalMemoryHandle : OrtExternalMemoryHandle {
   std::unique_ptr<char[]> simulated_ptr;  ///< Simulated mapped pointer (CPU memory for testing)
 
-  ExampleExternalMemoryHandle(const OrtExternalMemoryDescriptor& descriptor_in)
+  ExampleExternalMemoryHandle()
       : simulated_ptr(nullptr) {
     // Initialize base struct fields
     version = ORT_API_VERSION;
     ep_device = nullptr;
-    descriptor = descriptor_in;
+    handle_type = ORT_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE;
+    size_bytes = 0;
+    offset_bytes = 0;
     Release = ReleaseCallback;
   }
 
@@ -46,12 +48,12 @@ struct ExampleExternalMemoryHandle : OrtExternalMemoryHandle {
 struct ExampleExternalSemaphoreHandle : OrtExternalSemaphoreHandle {
   std::atomic<uint64_t> value;  ///< Simulated fence value for testing
 
-  ExampleExternalSemaphoreHandle(const OrtExternalSemaphoreDescriptor& descriptor_in)
+  ExampleExternalSemaphoreHandle()
       : value(0) {
     // Initialize base struct fields
     version = ORT_API_VERSION;
     ep_device = nullptr;
-    descriptor = descriptor_in;
+    type = ORT_EXTERNAL_SEMAPHORE_D3D12_FENCE;
     Release = ReleaseCallback;
   }
 

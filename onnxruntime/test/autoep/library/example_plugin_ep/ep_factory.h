@@ -77,18 +77,7 @@ class ExampleEpFactory : public OrtEpFactory, public ApiPtrs {
       const OrtEpDevice* ep_device,
       OrtExternalResourceImporterImpl** out_importer) noexcept;
 
-  static OrtStatus* ORT_API_CALL GetHardwareDeviceIncompatibilityDetailsImpl(
-      OrtEpFactory* this_ptr,
-      const OrtHardwareDevice* hw,
-      OrtDeviceEpIncompatibilityDetails* details) noexcept;
-
-  static OrtStatus* ORT_API_CALL GetNumCustomOpDomainsImpl(OrtEpFactory* this_ptr,
-                                                           _Out_ size_t* num_domains) noexcept;
-
-  static OrtStatus* ORT_API_CALL GetCustomOpDomainsImpl(OrtEpFactory* this_ptr,
-                                                        _Outptr_result_maybenull_ OrtCustomOpDomain** domains,
-                                                        _Out_ size_t num_domains) noexcept;
-
+  const OrtLogger& default_logger_;        // default logger for the EP factory
   const std::string ep_name_;              // EP name
   const std::string vendor_{"Contoso"};    // EP vendor name
   const uint32_t vendor_id_{0xB357};       // EP vendor ID

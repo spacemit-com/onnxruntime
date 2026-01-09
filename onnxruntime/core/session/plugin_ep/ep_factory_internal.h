@@ -97,6 +97,11 @@ class EpFactoryInternal : public OrtEpFactory {
     return impl_->GetHardwareDeviceIncompatibilityDetails(hw, details);
   }
 
+  OrtStatus* CreateExternalResourceImporterForDevice(_In_ const OrtEpDevice* ep_device,
+                                                     _Outptr_result_maybenull_ OrtExternalResourceImporterImpl** importer) noexcept {
+    return impl_->CreateExternalResourceImporterForDevice(ep_device, importer);
+  }
+
   // Function ORT calls to release an EP instance.
   void ReleaseEp(OrtEp* /*ep*/) noexcept {
     // we never create an OrtEp so we should never be trying to release one
