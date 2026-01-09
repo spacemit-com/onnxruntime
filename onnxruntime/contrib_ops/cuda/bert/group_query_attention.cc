@@ -191,10 +191,7 @@ Status GroupQueryAttention<T>::ComputeInternal(OpKernelContext* context) const {
                                                                  parameters.head_size,
                                                                  parameters.num_heads,
                                                                  parameters.kv_num_heads);
-  // Allocate buffers
-  size_t softmax_lse_bytes = 0;
-  size_t softmax_lse_accum_bytes = 0;
-  size_t out_accum_bytes = 0;
+  data.use_flash_attention_fast_decode = use_flash_attention && !disable_flash_decode_ && !parameters.is_first_prompt && parameters.kv_share_buffer;
   if (use_flash_attention) {
     data.use_flash_attention = true;
     data.use_memory_efficient_attention = false;
@@ -216,12 +213,33 @@ Status GroupQueryAttention<T>::ComputeInternal(OpKernelContext* context) const {
   }
 #endif
 
-#if USE_MEMORY_EFFICIENT_ATTENTION
-  int sm = (device_prop.major * 10) + device_prop.minor;
-  bool use_memory_efficient_attention =
-      !use_flash_attention &&
-      !disable_memory_efficient_attention_ &&
-      has_memory_efficient_attention(sm, std::is_same<T, MLFloat16>::value, std::is_same<T, BFloat16>::value, parameters.head_size, parameters.head_size);
+  if (data.use_flash_attention_fast_decode && parameters.sequence_length == 1) {
+    // FlashAttentionDecoding Fast Path:
+    // - Uses Flash Attention's internal KV append logic, so total_seq_lens and padded_seq_lens are not needed.
+    // - Past_seq_lens is passed as seqlens_k to Flash Attention, which uses it to:
+    //   1. Determine where to append new K/V in the cache
+    //   2. Apply correct causal masking (attention only to positions [0, past_seq_len])
+    // - The input seqlens_k from ONNX graph is (total_len - 1), which equals past_seq_len when seq_len == 1.
+    // - This optimization avoids launching GetSequenceLengths kernel for single-token decoding.
+    data.past_seq_lens = const_cast<int*>(total_seq_lens_minus_one->Data<int>());
+  } else {
+    // Compute sequence length buffers (past_seq_lens and total_seq_lens).
+    // Allocate buffer for both: first half is past_seq_lens, second half is total_seq_lens.
+    seq_lens_buffer = GetScratchBuffer<int>(3 * parameters.batch_size, context->GetComputeStream());
+    auto cuda_stream = static_cast<cudaStream_t>(context->GetComputeStream()->GetHandle());
+    data.past_seq_lens = seq_lens_buffer.get();
+    data.total_seq_lens = seq_lens_buffer.get() + parameters.batch_size;
+    data.padded_seq_lens = data.total_seq_lens + parameters.batch_size;
+    ORT_RETURN_IF_ERROR(LaunchGetSequenceLengths(total_seq_lens_minus_one->Data<int>(),
+                                                 data.past_seq_lens,
+                                                 data.total_seq_lens,
+                                                 data.padded_seq_lens,
+                                                 parameters.batch_size,
+                                                 parameters.sequence_length,
+                                                 parameters.is_first_prompt,
+                                                 cuda_stream,
+                                                 device_prop.maxThreadsPerBlock));
+  }
 
   if (!use_flash_attention) {
     // Fall back to memory efficient attention.

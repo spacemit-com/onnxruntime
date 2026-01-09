@@ -63,13 +63,18 @@ namespace cuda {
 
 // Concat new to past in present. Supports past BSNH or past BNSH
 template <typename T>
-Status LaunchConcatNewToPastKV(GroupQueryAttentionParameters& parameters,
-                               GroupQueryAttentionData<T>& data,
-                               const void* new_key,
-                               const void* new_value,
-                               cudaStream_t stream,
-                               const int max_threads_per_block,
-                               const bool past_only = false) {
+Status LaunchConcatNewToPastKVHelper(GroupQueryAttentionParameters& parameters,
+                                     GroupQueryAttentionData<T>& data,
+                                     const void* new_key,
+                                     const void* new_value,
+                                     cudaStream_t stream,
+                                     const int max_threads_per_block,
+                                     const bool past_only = false,
+                                     const T* cos_cache = nullptr,
+                                     const T* sin_cache = nullptr,
+                                     const int rotary_dim = 0,
+                                     const int64_t* position_ids = nullptr,
+                                     const bool interleaved = false) {
   const int batch_size = parameters.batch_size;
   const int kv_sequence_length = parameters.sequence_length;
   const int past_sequence_length = parameters.seqlen_past_kv_cache;
@@ -239,7 +244,8 @@ __global__ void UngroupLarge(const T* kv_in,
 }
 
 // Ungroup kv or present kv for use in Memory Efficient kernel. If present kv is not null and is BNSH, transposes it.
-Status LaunchUngroup(GroupQueryAttentionParameters& parameters,
+template <typename T>
+Status LaunchUngroup(const GroupQueryAttentionParameters& parameters,
                      float2* k_buff, float2* v_buff,
                      const float2* k_og, const float2* v_og,
                      const int buff_seqlen, const int og_seqlen,
@@ -1047,9 +1053,9 @@ Status FlashAttention(
   ORT_RETURN_IF_ERROR(onnxruntime::flash::mha_fwd_kvcache(
       device_prop, stream, query, present_key, present_value,
       kernel_new_k, kernel_new_v,
-      data.output, reinterpret_cast<void*>(data.softmax_lse), seq_lens, cos_cache, sin_cache,
-      /*cache_batch_idx*/ nullptr, /*leftpad_k*/ nullptr, head_sink, /*block_table*/ nullptr,
-      batch_size, num_heads, kv_num_heads, head_size, sequence_length,
+      data.output, reinterpret_cast<void*>(data.softmax_lse), seq_lens,
+      cos_cache, sin_cache, head_sink, /*block_table*/ nullptr, batch_size,
+      num_heads, kv_num_heads, head_size, sequence_length,
       parameters.seqlen_present_kv_cache, kv_sequence_length,
       parameters.rotary_dim, scale, parameters.softcap, is_causal, is_bf16,
       parameters.use_smooth_softmax, past_bsnh, parameters.num_splits,
