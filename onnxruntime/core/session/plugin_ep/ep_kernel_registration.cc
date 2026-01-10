@@ -12,43 +12,10 @@
 #include "core/framework/error_code_helper.h"
 #include "core/framework/kernel_registry.h"
 #include "core/framework/tensor.h"
+#include "core/providers/cpu/controlflow/utils.h"
 #include "core/session/allocator_adapters.h"
 #include "core/session/plugin_ep/ep_api.h"
 #include "core/session/plugin_ep/ep_control_flow_kernel_impls.h"
-
-//
-// OrtSharedPrePackedWeightCache
-//
-OrtSharedPrePackedWeightCache::OrtSharedPrePackedWeightCache(onnxruntime::PrePackedWeights& container,
-                                                             onnxruntime::AllocatorPtr allocator)
-    : container_(container), allocator_(std::move(allocator)) {}
-
-void OrtSharedPrePackedWeightCache::SetBuffers(void** data_ptrs, size_t* data_sizes, size_t num_buffers) {
-  container_.buffers_.clear();
-  container_.buffer_sizes_.clear();
-
-  container_.buffers_.reserve(num_buffers);
-  container_.buffer_sizes_.reserve(num_buffers);
-
-  for (size_t i = 0; i < num_buffers; i++) {
-    auto data_unique_ptr = onnxruntime::IAllocatorUniquePtr<void>(data_ptrs[i], onnxruntime::BufferDeleter(allocator_));
-    container_.buffers_.push_back(std::move(data_unique_ptr));
-    container_.buffer_sizes_.push_back(data_sizes[i]);
-  }
-}
-
-bool OrtSharedPrePackedWeightCache::HasData() const noexcept {
-  return !container_.buffers_.empty();
-}
-
-void OrtSharedPrePackedWeightCache::ReleaseAllData() noexcept {
-  for (onnxruntime::IAllocatorUniquePtr<void>& data_unique_ptr : container_.buffers_) {
-    data_unique_ptr.release();
-  }
-
-  container_.buffers_.clear();
-  container_.buffer_sizes_.clear();
-}
 
 //
 // OrtSharedPrePackedWeightCache
@@ -183,6 +150,25 @@ class PluginEpOpKernel final : public controlflow::IControlFlowKernel {
 
     used_shared_buffers = true;
     return Status::OK();
+  }
+
+  Status SetupSubgraphExecutionInfo(const SessionState& session_state,
+                                    const std::string& attribute_name,
+                                    const SessionState& subgraph_session_state) override {
+    assert(kernel_impl_ != nullptr);  // Should be ensured by PluginEpOpKernel::Create().
+
+    if ((kernel_impl_->flags & OrtKernelImplFlags::kIsControlFlowKernelImpl) == 0) {
+      // This is not a control flow OrtKernelImpl created by ORT, which prevents casting OrtKernelImpl to
+      // PluginEpControlFlowKernelImpl and setting up subgraph execution info. The plugin EP may have tried to create
+      // their own OrtKernelImpl, which is not supported for control flow ops.
+      const auto& op_type = Info().node().OpType();
+      return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "OrtKernelImpl instance for control flow operator ", op_type,
+                             " was not originally created by ORT via an OrtEpApi function.");
+    }
+
+    auto& cf_kernel = static_cast<PluginEpControlFlowKernelImpl&>(*kernel_impl_);
+    return cf_kernel.GetIControlFlowKernel().SetupSubgraphExecutionInfo(session_state, attribute_name,
+                                                                        subgraph_session_state);
   }
 
  private:
