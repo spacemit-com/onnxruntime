@@ -178,11 +178,13 @@ size_t get_out_accum_size(size_t num_splits, size_t batch_size, size_t num_heads
 void run_mha_fwd(Flash_fwd_params& params, cudaStream_t stream, bool force_split_kernel = false) {
   FP16_SWITCH(!params.is_bf16, [&] {
     HEADDIM_SWITCH(params.d, [&] {
-      if (params.num_splits <= 1 && !force_split_kernel) {
-        run_mha_fwd_<elem_type, kHeadDim>(params, stream);
-      } else {
-        run_mha_fwd_splitkv_dispatch<elem_type, kHeadDim>(params, stream);
-      }
+      BOOL_SWITCH(params.is_causal, Is_causal_const, [&] {
+        if (params.num_splits <= 1 && !force_split_kernel) {  // If we don't set it num_splits == 0
+          run_mha_fwd_<elem_type, kHeadDim, Is_causal_const>(params, stream);
+        } else {
+          run_mha_fwd_splitkv_dispatch<elem_type, kHeadDim, Is_causal_const>(params, stream);
+        }
+      });
     });
   });
 }
@@ -526,19 +528,6 @@ Status mha_fwd_kvcache(const cudaDeviceProp& dprops,
     params.q_head_stride = head_size;
     params.knew_head_stride = head_size;
     params.vnew_head_stride = head_size;
-
-    params.knew_ptr = nullptr;
-    params.vnew_ptr = nullptr;
-  } else {
-    params.seqlen_knew = 0;
-    params.knew_ptr = nullptr;
-    params.vnew_ptr = nullptr;
-    params.knew_batch_stride = 0;
-    params.vnew_batch_stride = 0;
-    params.knew_row_stride = 0;
-    params.vnew_row_stride = 0;
-    params.knew_head_stride = 0;
-    params.vnew_head_stride = 0;
   }
 
   params.is_seqlens_k_cumulative = seqlens_k_ == nullptr;
@@ -581,7 +570,7 @@ Status mha_fwd_kvcache(const cudaDeviceProp& dprops,
   // or if using packed QKV (to ensure correct handling of strided inputs which might be better supported or isolated in split kernel logic).
   // Note: if the fused kernel handles packing/rotary/appending, it should pass is_packed_qkv=false to this API (via use_packed_for_fa=false),
   // effectively bypassing this check and allowing standard kernels if otherwise eligible.
-  bool force_split = (k_new != nullptr) || is_packed_qkv;
+  bool force_split = (k_new != nullptr) || is_packed_qkv || cache_batch_idx != nullptr;
 
   run_mha_fwd(params, stream, force_split);
 
