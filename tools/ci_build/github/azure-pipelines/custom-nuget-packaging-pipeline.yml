@@ -3,11 +3,6 @@ parameters:
   type: string
   default: '12.8'
 
-- name: QnnSdk
-  displayName: QNN SDK Version
-  type: string
-  default: 2.41.0.251128
-
 - name: IsReleaseBuild
   displayName: Is a release build? Set it to true if you are doing an Onnx Runtime release.
   type: boolean
@@ -135,13 +130,6 @@ extends:
         parameters:
           IsReleaseBuild: ${{ parameters.IsReleaseBuild }}
           DoEsrp: true
-          ArtifactName: 'drop-nuget-qnn-arm64'
-          # Add --use_webgpu to enable WebGPU
-          StageName: 'OnnxRuntime_QNN_Nuget_Win_Arm64'
-          build_config: 'RelWithDebInfo'
-          PublishArchive: true
-          PublishNugetToFeed: false
-          AdditionalBuildArgs: '--caller_framework WinAI'
 
       - template: templates/mac-cpu-packaging-pipeline.yml
         parameters:
