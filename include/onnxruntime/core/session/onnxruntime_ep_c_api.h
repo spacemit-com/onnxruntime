@@ -1429,6 +1429,23 @@ struct OrtEpApi {
                   _Outptr_ OrtKernelImpl** kernel_out);
 
   ORT_CLASS_RELEASE(KernelImpl);
+
+  /** \brief Gets a new OrtKeyValuePairs instance containing a copy of all configuration entries set on the environment.
+   *
+   * \note An application provides environment-level configuration options for execution provider libraries by
+   *       using keys with the prefix 'ep_factory.<ep_name>.'. Ex: the key 'ep_factory.my_ep.some_ep_key' represents
+   *       a key named 'some_ep_key' that is meant to be consumed by an execution provider named 'my_ep'. Refer to
+   *       the specific execution provider's documentation for valid keys and values.
+   *
+   * \note Refer to onnxruntime_env_config_keys.h for common configuration entry keys and their supported values.
+   *
+   * \param[out] out Output parameter set to the OrtKeyValuePairs instance containing all configuration entries.
+   *                 Must be released via OrtApi::ReleaseKeyValuePairs.
+   *
+   * \snippet{doc} snippets.dox OrtStatus Return Value
+   * \since Version 1.24
+   */
+  ORT_API2_STATUS(GetEnvConfigEntries, _Outptr_ OrtKeyValuePairs** config_entries);
 };
 
 /**
@@ -1981,28 +1998,6 @@ struct OrtEpFactory {
                   _In_ const OrtMemoryDevice* memory_device,
                   _In_opt_ const OrtKeyValuePairs* stream_options,
                   _Outptr_ OrtSyncStreamImpl** stream);
-
-  /** \brief Check for known incompatibility reasons between a hardware device and this execution provider.
-   *
-   * This function allows an execution provider to check if a specific hardware device is compatible
-   * with the execution provider. The EP can set specific incompatibility reasons via the
-   * OrtDeviceEpIncompatibilityDetails parameter using OrtEpApi::DeviceEpIncompatibilityDetails_SetDetails.
-   *
-   * \param[in] this_ptr The OrtEpFactory instance.
-   * \param[in] hw The hardware device to check for incompatibility.
-   * \param[in,out] details Pre-allocated incompatibility details object created and initialized by ORT.
-   *                        The EP can use OrtEpApi::DeviceEpIncompatibilityDetails_SetDetails to set
-   *                        incompatibility information. If the device is compatible, the EP can
-   *                        leave the object unchanged (it defaults to no incompatibility).
-   *
-   * \note Implementation of this function is optional.
-   *       If not implemented, ORT will assume the device is compatible with this EP.
-   *
-   * \snippet{doc} snippets.dox OrtStatus Return Value
-   *
-   * \since Version 1.24.
-   */
-  ORT_API2_STATUS(SetEnvironmentOptions, _In_ OrtEpFactory* this_ptr, _In_ const OrtKeyValuePairs* options);
 
   /** \brief Check for known incompatibility reasons between a hardware device and this execution provider.
    *

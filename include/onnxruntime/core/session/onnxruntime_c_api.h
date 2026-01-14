@@ -972,10 +972,6 @@ typedef void (*RunAsyncCallbackFn)(void* user_data, OrtValue** outputs, size_t n
  * @{
  */
 
-/** \addtogroup Global
- * @{
- */
-
 /** \brief External memory handle type for importing GPU resources.
  *
  * \todo Add OPAQUE_WIN32 for Windows Vulkan-specific memory handles
@@ -7006,6 +7002,20 @@ struct OrtApi {
   ORT_CLASS_RELEASE(DeviceEpIncompatibilityDetails);
 
   /// @}
+
+  /** \brief Create an OrtEnv instance with the given options.
+   *
+   * \note Invoking this function will return the same instance of the environment as that returned by a previous call
+   *       to another env creation function; all arguments to this function will be ignored.
+   *
+   * \param[in] options The OrtEnvCreationOptions instance that contains creation options.
+   * \param[out] out Output parameter set to the new OrtEnv instance. Must be freed with OrtApi::ReleaseEnv.
+   *
+   * \snippet{doc} snippets.dox OrtStatus Return Value
+   *
+   * \since Version 1.24
+   */
+  ORT_API2_STATUS(CreateEnvWithOptions, _In_ const OrtEnvCreationOptions* options, _Outptr_ OrtEnv** out);
 };
 
 /*
