@@ -1686,7 +1686,7 @@ Return Value:
     // Compute the number of bytes required to hold the packed buffer.
     //
     // KleidiAI or other override
-    #if defined(USE_KLEIDIAI) && !defined(_MSC_VER)
+    #if defined(USE_KLEIDIAI)
     if (GetMlasPlatform().MlasGemmPackBSizeOverride != nullptr &&
         // TODO: Remove once KAI supports transposing for A
         TransA != CBLAS_TRANSPOSE::CblasTrans) {
@@ -1753,7 +1753,7 @@ Return Value:
 
 --*/
 {
-#if defined(USE_KLEIDIAI) && !defined(_MSC_VER)
+#if defined(USE_KLEIDIAI)
     if (GetMlasPlatform().MlasGemmPackBOverride != nullptr  &&
         // TODO: Remove once KAI supports transposing for A
         TransA != CBLAS_TRANSPOSE::CblasTrans    &&
