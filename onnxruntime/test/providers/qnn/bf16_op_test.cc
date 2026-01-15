@@ -14,8 +14,11 @@ namespace onnxruntime {
 namespace test {
 
 // Helper function to create a simple Add model for BF16 testing
-[[maybe_unused]] static GetTestModelFn BuildBF16AddTestCase(const TestInputDef<float>& input1_def,
-                                                            const TestInputDef<float>& input2_def) {
+static GetTestModelFn BuildBF16AddTestCase(const TestInputDef<float>& input1_def,
+                                           const TestInputDef<float>& input2_def) {
+  // Silence unused function warning
+  (void)BuildBF16AddTestCase;
+
   return [input1_def, input2_def](ModelTestBuilder& builder) {
     NodeArg* input1 = MakeTestInput(builder, input1_def);
     NodeArg* input2 = MakeTestInput(builder, input2_def);
@@ -25,8 +28,11 @@ namespace test {
 }
 
 // Helper function to create a simple MatMul model for BF16 testing
-[[maybe_unused]] static GetTestModelFn BuildBF16MatMulTestCase(const TestInputDef<float>& input1_def,
-                                                               const TestInputDef<float>& input2_def) {
+static GetTestModelFn BuildBF16MatMulTestCase(const TestInputDef<float>& input1_def,
+                                              const TestInputDef<float>& input2_def) {
+  // Silence unused function warning
+  (void)BuildBF16MatMulTestCase;
+
   return [input1_def, input2_def](ModelTestBuilder& builder) {
     NodeArg* input1 = MakeTestInput(builder, input1_def);
     NodeArg* input2 = MakeTestInput(builder, input2_def);
@@ -36,8 +42,11 @@ namespace test {
 }
 
 // Helper function to create a Conv model for BF16 testing
-[[maybe_unused]] static GetTestModelFn BuildBF16ConvTestCase(const TestInputDef<float>& input_def,
-                                                             const TestInputDef<float>& weights_def) {
+static GetTestModelFn BuildBF16ConvTestCase(const TestInputDef<float>& input_def,
+                                            const TestInputDef<float>& weights_def) {
+  // Silence unused function warning
+  (void)BuildBF16ConvTestCase;
+
   return [input_def, weights_def](ModelTestBuilder& builder) {
     NodeArg* input = MakeTestInput(builder, input_def);
     NodeArg* weights = MakeTestInput(builder, weights_def);
@@ -47,11 +56,13 @@ namespace test {
 }
 
 // Helper function to run BF16 model test
-[[maybe_unused]] static void RunBF16ModelTest(const GetTestModelFn& build_test_case,
-                                              const std::vector<int64_t>& input_shape,
-                                              ExpectedEPNodeAssignment expected_ep_assignment = ExpectedEPNodeAssignment::All,
-                                              int opset = 18,
-                                              float fp32_abs_err = 1e-2f) {
+static void RunBF16ModelTest(const GetTestModelFn& build_test_case,
+                             const std::vector<int64_t>& input_shape,
+                             ExpectedEPNodeAssignment expected_ep_assignment = ExpectedEPNodeAssignment::All,
+                             int opset = 18,
+                             float fp32_abs_err = 1e-2f) {
+  // Silence unused function warning
+  (void)RunBF16ModelTest;
   ORT_UNUSED_PARAMETER(input_shape);
 
   ProviderOptions provider_options;
