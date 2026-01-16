@@ -38,6 +38,7 @@
 #include "core/session/allocator_adapters.h"
 #include "core/session/compile_api.h"
 #include "core/session/environment.h"
+#include "core/session/ep_graph_assignment_info.h"
 #include "core/session/interop_api.h"
 #include "core/session/plugin_ep/ep_api.h"
 #include "core/session/plugin_ep/ep_library_internal.h"
@@ -4508,6 +4509,12 @@ static constexpr OrtApi ort_api_1_to_24 = {
     &OrtApis::ReleaseDeviceEpIncompatibilityDetails,
 
     &OrtApis::CreateEnvWithOptions,
+    &OrtApis::Session_GetEpGraphAssignmentInfo,
+    &OrtApis::EpAssignedSubgraph_GetEpName,
+    &OrtApis::EpAssignedSubgraph_GetNodes,
+    &OrtApis::EpAssignedNode_GetName,
+    &OrtApis::EpAssignedNode_GetDomain,
+    &OrtApis::EpAssignedNode_GetOperatorType,
 };
 
 // OrtApiBase can never change as there is no way to know what version of OrtApiBase is returned by OrtGetApiBase.

@@ -220,7 +220,10 @@ void RunScanMulModel(const Ort::SessionOptions& session_options) {
   EXPECT_THAT(output_span, ::testing::ElementsAre(2.f, 4.f, 6.f, 20.f, 40.f, 60.f, 200.f, 400.f, 600.f));
 }
 
-void RunPartiallySupportedModelWithPluginEp(const Ort::SessionOptions& session_options) {
+using CheckEpNodeAssignmentFunc = std::function<void(const Ort::Session& session)>;
+
+void RunAddMulAddModel(const Ort::SessionOptions& session_options,
+                       CheckEpNodeAssignmentFunc check_ep_node_assignment_func = {}) {
   // This model has Add -> Mul -> Add. The example plugin EP supports Mul but not Add.
   Ort::Session session(*ort_env, ORT_TSTR("testdata/add_mul_add.onnx"), session_options);
 
