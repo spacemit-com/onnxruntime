@@ -250,36 +250,13 @@ ArmKleidiAI::MlasDynamicQGemmBatch(
                 );
             }
         else {
-            #if defined(ENABLE_QMX_KERNELS)
-                if(ArmKleidiAI::vendor_name.compare("Qualcomm") == 0)
-                {
-                    kai_run_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_qmx_mopa(
-                        TileSizeM, TileSizeN, Shape.K, ATile, BTile,
-                        dst_tile,
-                        DataParams[BIdx].ldc * sizeof(float),
-                        sizeof(float),
-                        -std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
-                        );
-                }
-                else
-                {
-                    kai_run_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_sme_mopa(
-                        TileSizeM, TileSizeN, Shape.K, ATile, BTile,
-                        dst_tile,
-                        DataParams[BIdx].ldc * sizeof(float),
-                        sizeof(float),
-                        -std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
-                        );
-                }
-            #else
-                kai_run_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_sme_mopa(
-                        TileSizeM, TileSizeN, Shape.K, ATile, BTile,
-                        dst_tile,
-                        DataParams[BIdx].ldc * sizeof(float),
-                        sizeof(float),
-                        -std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
-                        );
-            #endif // ENABLE_QMX_KERNELS
+            kai_run_matmul_clamp_f32_qai8dxp1vlx4_qsi8cxp4vlx4_1vlx4vl_sme_mopa(
+                TileSizeM, TileSizeN, Shape.K, ATile, BTile,
+                dst_tile,
+                DataParams[BIdx].ldc * sizeof(float),
+                sizeof(float),
+                -std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
+                );
         }
     });
 }
