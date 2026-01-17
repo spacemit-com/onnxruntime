@@ -4507,7 +4507,6 @@ static constexpr OrtApi ort_api_1_to_24 = {
     &OrtApis::DeviceEpIncompatibilityDetails_GetNotes,
     &OrtApis::DeviceEpIncompatibilityDetails_GetErrorCode,
     &OrtApis::ReleaseDeviceEpIncompatibilityDetails,
-
     &OrtApis::CreateEnvWithOptions,
     &OrtApis::Session_GetEpGraphAssignmentInfo,
     &OrtApis::EpAssignedSubgraph_GetEpName,
@@ -4515,6 +4514,7 @@ static constexpr OrtApi ort_api_1_to_24 = {
     &OrtApis::EpAssignedNode_GetName,
     &OrtApis::EpAssignedNode_GetDomain,
     &OrtApis::EpAssignedNode_GetOperatorType,
+    &OrtApis::RunOptionsSetSyncStream,
 };
 
 // OrtApiBase can never change as there is no way to know what version of OrtApiBase is returned by OrtGetApiBase.
