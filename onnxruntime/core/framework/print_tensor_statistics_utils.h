@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include "core/framework/print_tensor_utils.h"
+#include "core/framework/int2.h"
 
 namespace onnxruntime {
 namespace utils {
@@ -119,8 +120,35 @@ void PrintCommonStats(const T* data, size_t count, TensorStatisticsData& tensor_
     PrintValue(max);                                                    \
   }
 
+#define DEF_PRINT_COMMON_STATS_2BIT(TWO_BIT_TYPE)                      \
+  template <>                                                          \
+  inline void PrintCommonStats<TWO_BIT_TYPE>(                          \
+      const TWO_BIT_TYPE* data, size_t count, TensorStatisticsData&) { \
+    using UnpackedType = typename TWO_BIT_TYPE::UnpackedType;          \
+    UnpackedType min = data[0].GetElem(0);                             \
+    UnpackedType max = min;                                            \
+    for (size_t i = 1; i < count; i++) {                               \
+      auto indices = TWO_BIT_TYPE::GetTensorElemIndices(i);            \
+      auto value = data[indices.first].GetElem(indices.second);        \
+      if (value > max) {                                               \
+        max = value;                                                   \
+      }                                                                \
+      if (value < min) {                                               \
+        min = value;                                                   \
+      }                                                                \
+    }                                                                  \
+                                                                       \
+    std::cout << "Min=";                                               \
+    PrintValue(min);                                                   \
+                                                                       \
+    std::cout << ",Max=";                                              \
+    PrintValue(max);                                                   \
+  }
+
 DEF_PRINT_COMMON_STATS_4BIT(Int4x2)
 DEF_PRINT_COMMON_STATS_4BIT(UInt4x2)
+DEF_PRINT_COMMON_STATS_2BIT(Int2x4)
+DEF_PRINT_COMMON_STATS_2BIT(UInt2x4)
 #if !defined(DISABLE_FLOAT4_TYPES)
 DEF_PRINT_COMMON_STATS_4BIT(Float4E2M1x2)
 #endif

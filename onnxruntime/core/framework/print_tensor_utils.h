@@ -5,6 +5,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include "core/framework/int2.h"
 
 namespace onnxruntime {
 namespace utils {
@@ -94,8 +95,29 @@ void PrintCpuTensorSnippet(const T* tensor, int64_t dim0, int64_t dim1, int64_t 
     std::cout << std::endl;                                                                                 \
   }
 
+#define DEF_PRINT_CPU_TENSOR_SNIPPET_2D_2BIT(TWO_BIT_TYPE)                                                \
+  template <>                                                                                             \
+  inline void PrintCpuTensorSnippet<TWO_BIT_TYPE>(const TWO_BIT_TYPE* tensor, int64_t dim0, int64_t dim1, \
+                                                  int64_t edge_items) {                                   \
+    for (int64_t i = 0; i < dim0; i++) {                                                                  \
+      SKIP_NON_EDGE_ITEMS(dim0, i, edge_items);                                                           \
+      auto indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1));                   \
+      PrintValue(tensor[indices.first].GetElem(indices.second));                                          \
+      for (int64_t j = 1; j < dim1; j++) {                                                                \
+        SKIP_NON_EDGE_ITEMS_LAST_DIM(dim1, j, edge_items);                                                \
+        std::cout << ", ";                                                                                \
+        indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 + j));                  \
+        PrintValue(tensor[indices.first].GetElem(indices.second));                                        \
+      }                                                                                                   \
+      std::cout << std::endl;                                                                             \
+    }                                                                                                     \
+    std::cout << std::endl;                                                                               \
+  }
+
 DEF_PRINT_CPU_TENSOR_SNIPPET_2D_4BIT(Int4x2)
 DEF_PRINT_CPU_TENSOR_SNIPPET_2D_4BIT(UInt4x2)
+DEF_PRINT_CPU_TENSOR_SNIPPET_2D_2BIT(Int2x4)
+DEF_PRINT_CPU_TENSOR_SNIPPET_2D_2BIT(UInt2x4)
 #if !defined(DISABLE_FLOAT4_TYPES)
 DEF_PRINT_CPU_TENSOR_SNIPPET_2D_4BIT(Float4E2M1x2)
 #endif
@@ -144,8 +166,33 @@ void PrintCpuTensorSnippet(const T* tensor, int64_t dim0, int64_t dim1, int64_t 
     std::cout << std::endl;                                                                                               \
   }
 
+#define DEF_PRINT_CPU_TENSOR_SNIPPET_3D_2BIT(TWO_BIT_TYPE)                                                              \
+  template <>                                                                                                           \
+  inline void PrintCpuTensorSnippet<TWO_BIT_TYPE>(const TWO_BIT_TYPE* tensor, int64_t dim0, int64_t dim1, int64_t dim2, \
+                                                  int64_t edge_items) {                                                 \
+    for (int64_t i = 0; i < dim0; i++) {                                                                                \
+      SKIP_NON_EDGE_ITEMS(dim0, i, edge_items);                                                                         \
+      for (int64_t j = 0; j < dim1; j++) {                                                                              \
+        SKIP_NON_EDGE_ITEMS(dim1, j, edge_items);                                                                       \
+        auto indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 * dim2 + j * dim2));             \
+        PrintValue(tensor[indices.first].GetElem(indices.second));                                                      \
+        for (int64_t k = 1; k < dim2; k++) {                                                                            \
+          SKIP_NON_EDGE_ITEMS_LAST_DIM(dim2, k, edge_items);                                                            \
+          std::cout << ", ";                                                                                            \
+          indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 * dim2 + j * dim2 + k));            \
+          PrintValue(tensor[indices.first].GetElem(indices.second));                                                    \
+        }                                                                                                               \
+        std::cout << std::endl;                                                                                         \
+      }                                                                                                                 \
+      std::cout << std::endl;                                                                                           \
+    }                                                                                                                   \
+    std::cout << std::endl;                                                                                             \
+  }
+
 DEF_PRINT_CPU_TENSOR_SNIPPET_3D_4BIT(Int4x2)
 DEF_PRINT_CPU_TENSOR_SNIPPET_3D_4BIT(UInt4x2)
+DEF_PRINT_CPU_TENSOR_SNIPPET_3D_2BIT(Int2x4)
+DEF_PRINT_CPU_TENSOR_SNIPPET_3D_2BIT(UInt2x4)
 #if !defined(DISABLE_FLOAT4_TYPES)
 DEF_PRINT_CPU_TENSOR_SNIPPET_3D_4BIT(Float4E2M1x2)
 #endif
@@ -181,8 +228,27 @@ void PrintCpuTensorFull(const T* tensor, int64_t dim0, int64_t dim1) {
     std::cout << std::endl;                                                                                \
   }
 
+#define DEF_PRINT_CPU_TENSOR_FULL_2D_2BIT(TWO_BIT_TYPE)                                                  \
+  template <>                                                                                            \
+  inline void PrintCpuTensorFull<TWO_BIT_TYPE>(const TWO_BIT_TYPE* tensor, int64_t dim0, int64_t dim1) { \
+    for (int64_t i = 0; i < dim0; i++) {                                                                 \
+      auto indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1));                  \
+      PrintValue(tensor[indices.first].GetElem(indices.second));                                         \
+      ;                                                                                                  \
+      for (int64_t j = 1; j < dim1; j++) {                                                               \
+        std::cout << ", ";                                                                               \
+        indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 + j));                 \
+        PrintValue(tensor[indices.first].GetElem(indices.second));                                       \
+      }                                                                                                  \
+      std::cout << std::endl;                                                                            \
+    }                                                                                                    \
+    std::cout << std::endl;                                                                              \
+  }
+
 DEF_PRINT_CPU_TENSOR_FULL_2D_4BIT(Int4x2)
 DEF_PRINT_CPU_TENSOR_FULL_2D_4BIT(UInt4x2)
+DEF_PRINT_CPU_TENSOR_FULL_2D_2BIT(Int2x4)
+DEF_PRINT_CPU_TENSOR_FULL_2D_2BIT(UInt2x4)
 #if !defined(DISABLE_FLOAT4_TYPES)
 DEF_PRINT_CPU_TENSOR_FULL_2D_4BIT(Float4E2M1x2)
 #endif
@@ -224,8 +290,29 @@ void PrintCpuTensorFull(const T* tensor, int64_t dim0, int64_t dim1, int64_t dim
     std::cout << std::endl;                                                                                              \
   }
 
+#define DEF_PRINT_CPU_TENSOR_FULL_3D_2BIT(TWO_BIT_TYPE)                                                                \
+  template <>                                                                                                          \
+  inline void PrintCpuTensorFull<TWO_BIT_TYPE>(const TWO_BIT_TYPE* tensor, int64_t dim0, int64_t dim1, int64_t dim2) { \
+    for (int64_t i = 0; i < dim0; i++) {                                                                               \
+      for (int64_t j = 0; j < dim1; j++) {                                                                             \
+        auto indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 * dim2 + j * dim2));            \
+        PrintValue(tensor[indices.first].GetElem(indices.second));                                                     \
+        for (int64_t k = 1; k < dim2; k++) {                                                                           \
+          std::cout << ", ";                                                                                           \
+          indices = TWO_BIT_TYPE::GetTensorElemIndices(static_cast<size_t>(i * dim1 * dim2 + j * dim2 + k));           \
+          PrintValue(tensor[indices.first].GetElem(indices.second));                                                   \
+        }                                                                                                              \
+        std::cout << std::endl;                                                                                        \
+      }                                                                                                                \
+      std::cout << std::endl;                                                                                          \
+    }                                                                                                                  \
+    std::cout << std::endl;                                                                                            \
+  }
+
 DEF_PRINT_CPU_TENSOR_FULL_3D_4BIT(Int4x2)
 DEF_PRINT_CPU_TENSOR_FULL_3D_4BIT(UInt4x2)
+DEF_PRINT_CPU_TENSOR_FULL_3D_2BIT(Int2x4)
+DEF_PRINT_CPU_TENSOR_FULL_3D_2BIT(UInt2x4)
 #if !defined(DISABLE_FLOAT4_TYPES)
 DEF_PRINT_CPU_TENSOR_FULL_3D_4BIT(Float4E2M1x2)
 #endif
