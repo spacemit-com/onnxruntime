@@ -529,11 +529,4 @@ ONNX_CPU_OPERATOR_KERNEL(
     KernelDefBuilder().TypeConstraint("T", BuildKernelDefConstraintsFromTypeList<EnabledDataTypesOpset25>()),
     Transpose);
 
-// Opset 25
-ONNX_CPU_OPERATOR_KERNEL(
-    Transpose,
-    25,
-    KernelDefBuilder().TypeConstraint("T", BuildKernelDefConstraintsFromTypeList<EnabledDataTypesOpset25>()),
-    Transpose);
-
 }  // namespace onnxruntime
