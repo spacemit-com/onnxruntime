@@ -713,6 +713,13 @@ set(ONNXRUNTIME_TEST_LIBS
     onnxruntime_flatbuffers
 )
 
+if (onnxruntime_BUILD_SHARED_LIB)
+  set(ONNXRUNTIME_TEST_LIBS
+    onnxruntime
+    ${ONNXRUNTIME_TEST_LIBS}
+  )
+endif()
+
 if (onnxruntime_ENABLE_TRAINING)
   set(ONNXRUNTIME_TEST_LIBS onnxruntime_training_runner onnxruntime_training ${ONNXRUNTIME_TEST_LIBS})
 endif()

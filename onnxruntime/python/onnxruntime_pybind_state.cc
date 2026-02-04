@@ -461,7 +461,8 @@ py::object AddTensorAsPyObj(const OrtValue& val, const DataTransferManager* data
 static std::shared_ptr<onnxruntime::IExecutionProviderFactory> LoadExecutionProviderFactory(
     const std::string& ep_shared_lib_path,
     const ProviderOptions& provider_options = {},
-    const std::string& entry_symbol_name = "GetProvider") {
+    const std::string& entry_symbol_name = "GetProvider",
+    const SessionOptions* sess = nullptr) {
   void* handle;
   const auto path_str = ToPathString(ep_shared_lib_path);
   auto error = Env::Default().LoadDynamicLibrary(path_str, false, &handle);
@@ -469,11 +470,17 @@ static std::shared_ptr<onnxruntime::IExecutionProviderFactory> LoadExecutionProv
     throw std::runtime_error(error.ErrorMessage());
   }
 
-  Provider* (*PGetProvider)();
-  OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&PGetProvider));
+  if (sess == nullptr) {
+    Provider* (*PGetProvider)();
+    OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&PGetProvider));
 
-  Provider* provider = PGetProvider();
-  return provider->CreateExecutionProviderFactory(&provider_options);
+    Provider* provider = PGetProvider();
+    return provider->CreateExecutionProviderFactory(&provider_options);
+  } else {
+    std::shared_ptr<IExecutionProviderFactory> (*get_ep_factory)(const void*, const void*);
+    OrtPybindThrowIfError(Env::Default().GetSymbolFromLibrary(handle, entry_symbol_name, (void**)&get_ep_factory));
+    return get_ep_factory(&provider_options, sess);
+  }
 }
 
 #if defined(USE_CUDA) || defined(USE_CUDA_PROVIDER_INTERFACE)
@@ -1224,7 +1231,8 @@ static std::shared_ptr<IExecutionProviderFactory> CreateExecutionProviderFactory
             provider_options.insert(option);
           }
         }
-        return LoadExecutionProviderFactory(shared_lib_path_it->second, provider_options, entry_symbol);
+        auto* session_options_ptr = type == kSpaceMITExecutionProvider ? &session_options : nullptr;
+        return LoadExecutionProviderFactory(shared_lib_path_it->second, provider_options, entry_symbol, session_options_ptr);
       }
     }
     // unknown provider

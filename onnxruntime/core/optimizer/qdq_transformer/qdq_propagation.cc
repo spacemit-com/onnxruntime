@@ -26,7 +26,15 @@ bool CanNodePropagate(const Node& node) {
          graph_utils::IsSupportedOptypeVersionAndDomain(node, "Transpose", {1, 13, 21}) ||
          graph_utils::IsSupportedOptypeVersionAndDomain(node, "Squeeze", {1, 11, 13, 21}) ||
          graph_utils::IsSupportedOptypeVersionAndDomain(node, "Unsqueeze", {1, 11, 13, 21}) ||
-         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Slice", {1, 10, 11, 13});
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Slice", {1, 10, 11, 13}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Gather", {1, 11, 13}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Split", {1, 2, 11, 13, 18}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "GlobalMaxPool", {1}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Relu", {1, 6, 13, 14}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Pad", {1, 2, 11, 13, 18, 19}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Identity", {1, 13, 14, 16, 19}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Flatten", {1, 9, 11, 13}) ||
+         graph_utils::IsSupportedOptypeVersionAndDomain(node, "Clip", {1, 6, 11, 12, 13});
 }
 
 // Makes matching attributes for new QuantizeLinear nodes from an existing DequantizeLinear node.

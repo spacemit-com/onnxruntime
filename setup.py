@@ -129,6 +129,15 @@ class build_ext(_build_ext):  # noqa: N801
         logger.info("copying %s -> %s", ext.sources[0], dest_file)
         copyfile(ext.sources[0], dest_file)
 
+SHAREDLIB_IMPORTS = """
+try:
+    cur_dir = os.path.realpath(os.path.dirname(__file__))
+    libonnxruntime_path = glob.glob(os.path.join(cur_dir, "libonnxruntime.so*"))[0]
+    __libonnxruntime = CDLL(libonnxruntime_path, mode=RTLD_GLOBAL)
+    __libonnxruntime_providers_shared = CDLL(os.path.join(cur_dir, "libonnxruntime_providers_shared.so"), mode=RTLD_GLOBAL)
+except Exception as e:
+    raise ImportError("can not find libonnxruntime in sitepackages. {}".format(e))
+"""
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -156,6 +165,14 @@ try:
             _bdist_wheel.finalize_options(self)
             if not is_manylinux:
                 self.root_is_pure = False
+
+        def _rewrite_ld_preload_shared_lib(self):
+            with open("onnxruntime/capi/_ld_preload.py", "a") as f:
+                f.write("from ctypes import CDLL, RTLD_GLOBAL\n")
+                f.write("import site\n")
+                f.write("import os\n")
+                f.write("import glob\n")
+                f.write(SHAREDLIB_IMPORTS)
 
         def _rewrite_ld_preload(self, to_preload):
             with open("onnxruntime/capi/_ld_preload.py", "a") as f:
@@ -294,6 +311,8 @@ try:
                 self._rewrite_ld_preload_tensorrt(to_preload_tensorrt)
                 self._rewrite_ld_preload_tensorrt(to_preload_nv_tensorrt_rtx)
                 self._rewrite_ld_preload(to_preload_cann)
+            elif platform.machine() == "riscv64":
+                self._rewrite_ld_preload_shared_lib()
             else:
                 pass
 

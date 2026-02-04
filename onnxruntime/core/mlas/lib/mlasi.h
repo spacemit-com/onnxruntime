@@ -79,6 +79,9 @@ Abstract:
 #if defined(MLAS_TARGET_WASM_SIMD)
 #include <wasm_simd128.h>
 #endif
+#if defined(__riscv) && defined(__riscv_v) && defined(__riscv_v_intrinsic)
+#include <riscv_vector.h>
+#endif
 #endif
 
 //
@@ -345,8 +348,11 @@ static_assert(sizeof(MLAS_FP16) == FP16_SIZE);
 #define MLAS_HGEMM_STRIDEN_THREAD_ALIGN             32
 #define MLAS_SGEMM_STRIDEN_THREAD_ALIGN             16
 #define MLAS_DGEMM_STRIDEN_THREAD_ALIGN             8
+#if defined(RISCV_SPACEMIT_IME2)
+#define MLAS_QGEMM_STRIDEN_THREAD_ALIGN             32
+#else
 #define MLAS_QGEMM_STRIDEN_THREAD_ALIGN             16
-
+#endif
 //
 // Define the prototypes of the platform optimized routines.
 //
@@ -1094,6 +1100,20 @@ extern "C" {
     MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32KernelNeon;
     MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16KernelNeon;
 #endif
+
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasComputeExpF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasErfKernel_RVV;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL MlasReduceMaximumF32Kernel_RVV;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL MlasComputeSumExpF32Kernel_RVV;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeLogSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL MlasComputeSoftmaxOutputF32Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasTanhKernel_RVV;
+    MLAS_CAST_F16_TO_F32_KERNEL MlasCastF16ToF32Kernel_RVV;
+    MLAS_CAST_F32_TO_F16_KERNEL MlasCastF32ToF16Kernel_RVV;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL MlasLogisticKernel_RVV;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL MlasReduceMinimumMaximumF32Kernel_RVV;
+#endif
 }
 
 //
@@ -1176,7 +1196,15 @@ extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmU8X8DispatchWasmRelaxedSimd;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmQuantDispatchDefault;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchPOWER10;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchZVECTOR;
+#ifdef RISCV_SPACEMIT_IME1
+// Ime1
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmX8X8DispatchSpacemiTIme1_BASE;
+#endif
 
+#ifdef RISCV_SPACEMIT_IME2
+//  Ime2
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmX8X8DispatchSpacemiTIme2_BASE;
+#endif
 #if defined(MLAS_TARGET_WASM_RELAXED_SIMD)
 extern bool HasUSDot();
 #endif
@@ -1340,6 +1368,17 @@ struct MLAS_PLATFORM {
     MLAS_CONV_PREPARE_FLOAT_OVERRIDE* MlasConvPrepareOverride = nullptr;
     MLAS_CONV_FLOAT_OVERRIDE* MlasConvOverride = nullptr;
 
+#if defined(MLAS_TARGET_RISCV64)
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ComputeExpF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL* ErfKernelRoutine;
+    MLAS_REDUCE_MAXIMUM_FLOAT_KERNEL* ReduceMaximumF32Kernel;
+    MLAS_COMPUTE_SUMEXP_FLOAT_KERNEL* ComputeSumExpF32Kernel;
+    MLAS_COMPUTE_SOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_LOGSOFTMAX_OUTPUT_FLOAT_KERNEL* ComputeLogSoftmaxOutputF32Kernel;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * TanhKernelRoutine;
+    MLAS_COMPUTE_UNARY_FLOAT_KERNEL * LogisticKernelRoutine;
+    MLAS_REDUCE_MINIMUM_MAXIMUM_FLOAT_KERNEL* ReduceMinimumMaximumF32Kernel;
+#endif
 #if defined(MLAS_TARGET_AMD64_IX86) || defined(MLAS_TARGET_POWER) || defined(MLAS_TARGET_S390X)
     MLAS_GEMM_FLOAT_KERNEL* GemmFloatKernel;
 #endif

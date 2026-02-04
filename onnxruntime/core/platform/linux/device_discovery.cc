@@ -201,6 +201,7 @@ std::unordered_set<OrtHardwareDevice> DeviceDiscovery::DiscoverDevicesForPlatfor
   devices.emplace(GetCpuDeviceFromCPUIDInfo());
 
   // get GPU devices
+#if !defined(__riscv)
   {
     std::vector<OrtHardwareDevice> gpu_devices{};
     Status gpu_device_discovery_status = GetGpuDevices(gpu_devices);
@@ -211,7 +212,7 @@ std::unordered_set<OrtHardwareDevice> DeviceDiscovery::DiscoverDevicesForPlatfor
       LOGS_DEFAULT(WARNING) << "GPU device discovery failed: " << gpu_device_discovery_status.ErrorMessage();
     }
   }
-
+#endif
   // get NPU devices
   // TODO figure out how to discover these
 

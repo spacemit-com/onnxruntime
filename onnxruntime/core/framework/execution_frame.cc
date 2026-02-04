@@ -157,9 +157,17 @@ Status IExecutionFrame::GetOrCreateNodeOutputMLValue(const int output_index, int
       // already allocated. verify shape matches if tensor.
       if (p_ort_value->IsTensor()) {
         const Tensor& tensor = p_ort_value->Get<Tensor>();
-        ORT_ENFORCE(shape && tensor.Shape() == *shape,
-                    "OrtValue shape verification failed. Current shape:", tensor.Shape(),
-                    " Requested shape:", shape ? shape->ToString() : "null");
+        if (shape && tensor.Shape() != *shape) {
+          if (IsOutput(ort_value_idx)) {
+            VerifyOutputSizes(output_index, node, *shape);
+          }
+          *p_ort_value = OrtValue();  // reset so we can recreate below
+          status = CreateNodeOutputMLValueImpl(*p_ort_value, ort_value_idx, shape);
+        } else {
+          ORT_ENFORCE(shape && tensor.Shape() == *shape,
+                      "OrtValue shape verification failed. Current shape:", tensor.Shape(),
+                      " Requested shape:", shape ? shape->ToString() : "null");
+        }
       } else if (p_ort_value->IsSparseTensor()) {
 #if !defined(DISABLE_SPARSE_TENSORS)
         const SparseTensor& sp_tensor = p_ort_value->Get<SparseTensor>();

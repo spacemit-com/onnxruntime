@@ -34,6 +34,7 @@
 #include "core/framework/session_options.h"
 #include "core/session/onnxruntime_session_options_config_keys.h"
 #include "nlohmann/json.hpp"
+#include "test/util/test_spacemit_ep.h"
 
 #ifdef USE_CUDA
 #include "core/providers/cuda/cuda_provider_options.h"
@@ -56,10 +57,11 @@ void usage() {
       "\t-v: verbose\n"
       "\t-n [test_case_name]: Specifies a single test case to run.\n"
       "\t-e [EXECUTION_PROVIDER]: EXECUTION_PROVIDER could be 'cpu', 'cuda', 'dnnl', 'tensorrt', 'vsinpu'"
-      "'openvino', 'migraphx', 'acl', 'armnn', 'xnnpack', 'webgpu', 'nnapi', 'qnn', 'snpe' or 'coreml'. "
+      "'openvino', 'migraphx', 'acl', 'armnn', 'xnnpack', 'webgpu', 'nnapi', 'qnn', 'snpe', 'coreml' or 'spacemit'. "
       "Default: 'cpu'.\n"
       "\t-p: Pause after launch, can attach debugger and continue\n"
       "\t-x: Use parallel executor, default (without -x): sequential executor.\n"
+      "\t-X: [intra_op_num_threads]: Sets the number of threads used to parallelize the execution within nodes, A value of 0 means ORT will pick a default. Must >=0.\n"
       "\t-d [device_id]: Specifies the device id for multi-device (e.g. GPU). The value should > 0\n"
       "\t-t: Specify custom relative tolerance values for output value comparison. default: 1e-5\n"
       "\t-a: Specify custom absolute tolerance values for output value comparison. default: 1e-5\n"
@@ -217,6 +219,7 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   int repeat_count = 1;
   bool inference_mode = false;
   int p_models = GetNumCpuCores();
+  bool enable_spacemit = false;
   bool enable_cuda = false;
   bool enable_dnnl = false;
   bool enable_openvino = false;
@@ -248,11 +251,15 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   bool verbose_logging_required = false;
   bool ep_context_enable = false;
   bool disable_ep_context_embed_mode = false;
+  bool override_output = false;
+
+  int intra_thread_num = std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+
 
   bool pause = false;
   {
     int ch;
-    while ((ch = getopt(argc, argv, ORT_TSTR("Ac:hj:IMn:r:e:t:a:xvo:d:C:i:pzfb"))) != -1) {
+    while ((ch = getopt(argc, argv, ORT_TSTR("Ac:hj:IMn:r:e:t:a:xvo:X:d:C:i:pzfbO"))) != -1) {
       switch (ch) {
         case 'A':
           enable_cpu_mem_arena = false;
@@ -296,6 +303,8 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
           provider_name = ToUTF8String(optarg);
           if (!CompareCString(optarg, ORT_TSTR("cpu"))) {
             // do nothing
+          } else if (!CompareCString(optarg, ORT_TSTR("spacemit"))) {
+            enable_spacemit = true;
           } else if (!CompareCString(optarg, ORT_TSTR("cuda"))) {
             enable_cuda = true;
           } else if (!CompareCString(optarg, ORT_TSTR("dnnl"))) {
@@ -341,6 +350,9 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
           break;
         case 'x':
           execution_mode = ExecutionMode::ORT_PARALLEL;
+          break;
+        case 'X':
+          intra_thread_num = static_cast<int>(OrtStrtol<PATH_CHAR_TYPE>(optarg, nullptr));
           break;
         case 'p':
           pause = true;
@@ -400,6 +412,10 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
         case 'f':
           ep_context_enable = true;
           break;
+        case 'O':
+          fprintf(stdout, "Warning: Set override_output, please check the output!!!!!!!!\n");
+          override_output = true;
+          break;
         case '?':
         case 'h':
         default:
@@ -457,6 +473,9 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
   {
     Ort::SessionOptions sf;
 
+    fprintf(stdout, "Setting intra_op_num_threads to %d\n", intra_thread_num);
+    sf.SetIntraOpNumThreads(intra_thread_num);
+
     if (enable_cpu_mem_arena)
       sf.EnableCpuMemArena();
     else
@@ -475,6 +494,35 @@ int real_main(int argc, char* argv[], Ort::Env& env) {
       sf.AddConfigEntry(kOrtSessionOptionEpContextEmbedMode, "0");
     } else {
       sf.AddConfigEntry(kOrtSessionOptionEpContextEmbedMode, "1");
+    }
+
+    if (enable_spacemit) {
+      std::cout << "using SpaceMITExecutionProvider" << std::endl;
+      std::unordered_map<std::string, std::string> spacemit_ep_provider_options;
+      std::istringstream ss(ep_runtime_config_string);
+      std::string token;
+      while (ss >> token) {
+        if (token == "") {
+          continue;
+        }
+        auto pos = token.find("|");
+        if (pos == std::string::npos || pos == 0 || pos == token.length()) {
+          ORT_THROW("[ERROR] [SpacemiT EP] Use a '|' to separate the key and value for the run-time option you are trying to use.\n");
+        }
+
+        std::string key(token.substr(0, pos));
+        std::string value(token.substr(pos + 1));
+        if (key.find("SPACEMIT") == 0) {
+          std::cout << "setting " << key << " : " << value << std::endl;
+          spacemit_ep_provider_options[key] = value;
+        }
+      }
+
+      auto sts = onnxruntime::test::InitSpaceMITExecutionProvider(sf, spacemit_ep_provider_options);
+      if (sts != nullptr) {
+        fprintf(stderr, "InitSpaceMITExecutionProvider Error\n");
+        return -1;
+      }
     }
 
     for (auto& it : session_config_entries) {
@@ -957,7 +1005,7 @@ select from 'TF8', 'TF16', 'UINT8', 'FLOAT', 'ITENSOR'. \n)");
               });
 
     auto tp = TestEnv::CreateThreadPool(Env::Default());
-    TestEnv test_env(env, sf, tp.get(), std::move(tests), stat, inference_mode);
+    TestEnv test_env(env, sf, tp.get(), std::move(tests), stat, inference_mode, override_output);
     Status st = test_env.Run(p_models, concurrent_session_runs, repeat_count);
     if (!st.IsOK()) {
       fprintf(stderr, "%s\n", st.ErrorMessage().c_str());

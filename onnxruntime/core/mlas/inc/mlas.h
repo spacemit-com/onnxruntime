@@ -79,6 +79,20 @@ Abstract:
 #if defined(__loongarch64)
 #define MLAS_TARGET_LARCH64
 #endif
+
+#if defined(__riscv)
+#define MLAS_TARGET_RISCV
+#if defined(_LP64)
+#define MLAS_TARGET_RISCV64
+#else
+#define MLAS_TARGET_RISCV32
+#endif
+#endif
+
+#if defined(MLAS_TARGET_RISCV64) && defined(__riscv_v) && defined(__riscv_v)
+#define MLAS_RVV_SUPPORTED
+#endif
+
 //
 // Define the support levels for the target architecture.
 //

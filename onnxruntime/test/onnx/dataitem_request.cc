@@ -19,10 +19,11 @@ namespace onnxruntime {
 namespace test {
 
 std::pair<EXECUTE_RESULT, TIME_SPEC> DataTaskRequestContext::Run(const ITestCase& c, ::Ort::Session& session,
-                                                                 OrtAllocator* allocator, size_t task_id, bool inference_mode) {
+                                                                 OrtAllocator* allocator, size_t task_id, bool inference_mode, bool override) {
   std::pair<EXECUTE_RESULT, TIME_SPEC> result;
   Callback empty_cb;
   DataTaskRequestContext ctx(empty_cb, c, session, allocator, task_id, inference_mode);
+  ctx.SetOverrideOutputRef(override);
   ORT_TRY {
     result = ctx.RunImpl();
   }
@@ -37,9 +38,10 @@ std::pair<EXECUTE_RESULT, TIME_SPEC> DataTaskRequestContext::Run(const ITestCase
 
 void DataTaskRequestContext::Request(const Callback& cb, concurrency::ThreadPool* tp,
                                      const ITestCase& c, Ort::Session& session,
-                                     OrtAllocator* allocator, size_t task_id, bool inference_mode) {
+                                     OrtAllocator* allocator, size_t task_id, bool inference_mode, bool override) {
   assert(cb);
   std::unique_ptr<DataTaskRequestContext> self = std::make_unique<DataTaskRequestContext>(cb, c, session, allocator, task_id, inference_mode);
+  self->SetOverrideOutputRef(override);
   CallableFactory<DataTaskRequestContext, void> f(self.get());
   auto runnable = f.GetCallable<&DataTaskRequestContext::RunAsync>();
   onnxruntime::concurrency::ThreadPool::Schedule(tp, [runnable]() { runnable.Invoke(); });
@@ -66,7 +68,8 @@ void DataTaskRequestContext::RunAsync() {
 std::pair<EXECUTE_RESULT, TIME_SPEC> DataTaskRequestContext::RunImpl() {
   onnxruntime::test::HeapBuffer holder;
   std::unordered_map<std::string, Ort::Value> feeds;
-  test_case_.LoadTestData(task_id_, holder, feeds, true);
+  std::unordered_map<std::string, std::string> name_to_file_map;
+  test_case_.LoadTestData(task_id_, holder, feeds, true, name_to_file_map);
 
   std::vector<const char*> input_names(feeds.size());
   std::vector<OrtValue*> input_values;
@@ -118,12 +121,14 @@ std::pair<EXECUTE_RESULT, TIME_SPEC> DataTaskRequestContext::RunImpl() {
   test_case_.GetRelativePerSampleTolerance(&relative_per_sample_tolerance);
   test_case_.GetPostProcessing(&post_procesing);
 
+  fprintf(stdout, "Running task %ld for %s\n", task_id_, test_case_.GetTestCaseName().c_str());
+
   if (inference_mode_) {
     test_case_.SaveResult(task_id_, output_values);
     return std::make_pair(EXECUTE_RESULT::SUCCESS, spent_time_);
   }
   std::unordered_map<std::string, Ort::Value> expected_output_values;
-  test_case_.LoadTestData(task_id_, holder, expected_output_values, false);
+  test_case_.LoadTestData(task_id_, holder, expected_output_values, false, name_to_file_map);
 
   std::unordered_map<std::string, OrtValue*> name_fetch_output_map;
   std::unordered_map<std::string, const ONNX_NAMESPACE::ValueInfoProto*> name_output_value_info_proto;
@@ -154,6 +159,14 @@ std::pair<EXECUTE_RESULT, TIME_SPEC> DataTaskRequestContext::RunImpl() {
 
     // Expected output is not None
     if (expected_output_value != nullptr) {
+      auto iter_file = name_to_file_map.find(output_name);
+      auto file_name = iter_file == name_to_file_map.end() ? "" : iter_file->second;
+
+      if (file_name != "" && override_output_ref_) {
+        fprintf(stdout, "Overriding output %s to file %s\n", output_name.c_str(), file_name.c_str());
+        // TODO: need to save the output OrtValue to the file
+      }
+
       // Actual output is None
       if (!actual_output_value->IsAllocated()) {
         ret = std::pair<COMPARE_RESULT, std::string>{

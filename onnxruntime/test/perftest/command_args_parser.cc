@@ -57,7 +57,7 @@ ABSL_FLAG(std::string, F, "",
           "[Usage]: -f \"dimension_denotation1:override_value1\" -f \"dimension_denotation2:override_value2\" ...  or"
           " -f \"dimension_denotation1:override_value1 dimension_denotation2 : override_value2... \". Override value must > 0.");
 ABSL_FLAG(std::string, m, "duration", "Specifies the test mode. Value could be 'duration' or 'times'.");
-ABSL_FLAG(std::string, e, "cpu", "Specifies the provider 'cpu','cuda','dnnl','tensorrt', 'nvtensorrtrtx', 'openvino', 'dml', 'acl', 'nnapi', 'coreml', 'qnn', 'snpe', 'migraphx', 'xnnpack', 'vitisai' or 'webgpu'.");
+ABSL_FLAG(std::string, e, "cpu", "Specifies the provider 'cpu','cuda','dnnl','tensorrt', 'nvtensorrtrtx', 'openvino', 'dml', 'acl', 'nnapi', 'coreml', 'qnn', 'snpe', 'migraphx', 'xnnpack', 'vitisai' , 'webgpu' or 'spacemit'.");
 ABSL_FLAG(size_t, r, DefaultPerformanceTestConfig().run_config.repeated_times, "Specifies the repeated times if running in 'times' test mode.");
 ABSL_FLAG(size_t, t, DefaultPerformanceTestConfig().run_config.duration_in_seconds, "Specifies the seconds to run for 'duration' mode.");
 ABSL_FLAG(std::string, p, "", "Specifies the profile name to enable profiling and dump the profile data to the file.");
@@ -321,6 +321,8 @@ bool CommandLineParser::ParseArguments(PerformanceTestConfig& test_config, int a
     if (!ep.empty()) {
       if (ep == "cpu") {
         test_config.machine_config.provider_type_name = onnxruntime::kCpuExecutionProvider;
+      } else if (ep == "spacemit") {
+        test_config.machine_config.provider_type_name = onnxruntime::kSpaceMITExecutionProvider;
       } else if (ep == "cuda") {
         test_config.machine_config.provider_type_name = onnxruntime::kCudaExecutionProvider;
       } else if (ep == "dnnl") {
