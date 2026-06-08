@@ -31,7 +31,14 @@ class ITestCase {
  public:
   virtual void LoadTestData(size_t id, onnxruntime::test::HeapBuffer& b,
                             std::unordered_map<std::string, Ort::Value>& name_data_map,
-                            bool is_input) const = 0;
+                            bool is_input,
+                            std::unordered_map<std::string, std::string>& name_to_file_map) const = 0;
+  void LoadTestData(size_t id, onnxruntime::test::HeapBuffer& b,
+                              std::unordered_map<std::string, Ort::Value>& name_data_map,
+                              bool is_input) {
+    std::unordered_map<std::string, std::string> name_to_file_map;
+    LoadTestData(id, b, name_data_map, is_input, name_to_file_map);
+  }
   virtual void SaveResult(size_t id, std::vector<Ort::Value>& out_values) const = 0;
   virtual const std::filesystem::path& GetModelUrl() const = 0;
   virtual const std::string& GetNodeName() const = 0;

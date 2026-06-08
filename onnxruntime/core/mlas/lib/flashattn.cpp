@@ -25,7 +25,7 @@ MlasFlashAttentionThreaded(
     const float* value = args->value;
     float* output = args->output;
 
-#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_RISCV64)
     auto&& mlas_platform = GetMlasPlatform();
 #endif
 
@@ -96,7 +96,7 @@ MlasFlashAttentionThreaded(
             for (ptrdiff_t irow = 0; irow < static_cast<ptrdiff_t>(row_size_q_capped); ++irow) {
                 float* p = intermediate + irow * row_size_kv_capped;
 
-#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_RISCV64)
                 float rowmax = mlas_platform.ReduceMaximumF32Kernel(p, row_size_kv_capped);
 #else
                 float rowmax = MlasReduceMaximumF32Kernel(p, row_size_kv_capped);
@@ -106,7 +106,7 @@ MlasFlashAttentionThreaded(
                 negmax = -m[irow];
                 m_diff -= m[irow];  // old - new (less than 0)
 
-#if defined(MLAS_TARGET_AMD64)
+#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_RISCV64)
                 float rowsum = mlas_platform.ComputeSumExpF32Kernel(p, p, row_size_kv_capped, &negmax);
 #else
                 float rowsum = MlasComputeSumExpF32Kernel(p, p, row_size_kv_capped, &negmax);

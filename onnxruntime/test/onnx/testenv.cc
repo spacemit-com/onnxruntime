@@ -18,13 +18,15 @@ std::unique_ptr<OrtThreadPool> TestEnv::CreateThreadPool(onnxruntime::Env& env) 
 }
 
 TestEnv::TestEnv(Ort::Env& env, Ort::SessionOptions& so, PThreadPool tp,
-                 std::vector<ITestCase*>&& tests, TestResultStat& stat, bool inference_mode)
+                 std::vector<ITestCase*>&& tests, TestResultStat& stat, bool inference_mode,
+                 bool override_output_ref)
     : env_(env),
       so_(so),
       inference_mode_(inference_mode),
       tp_(tp),
       tests_(std::move(tests)),
-      stat_(stat) {
+      stat_(stat),
+      override_output_ref_(override_output_ref) {
 }
 
 TestEnv::~TestEnv() {

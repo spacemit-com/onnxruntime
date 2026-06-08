@@ -916,6 +916,17 @@ MlasGemmQuantGetDispatch(
     if (GetMlasPlatform().GemmU8X8Dispatch == &MlasGemm8X8DispatchZVECTOR) {
         GemmQuantDispatch = GetMlasPlatform().GemmU8X8Dispatch;
     }
+#elif defined(MLAS_TARGET_RISCV64) && defined(__linux__)
+    auto vlenb = __riscv_vlenb();
+    if (vlenb == 32) {
+#ifdef RISCV_SPACEMIT_IME1
+        GemmQuantDispatch = &MlasGemmX8X8DispatchSpacemiTIme1_BASE;
+#endif
+    } else if (vlenb == 128) {
+#ifdef RISCV_SPACEMIT_IME2
+        GemmQuantDispatch = &MlasGemmX8X8DispatchSpacemiTIme2_BASE;
+#endif
+    }
 #endif
 #endif // !defined(FORCE_GENERIC_ALGORITHMS)
 

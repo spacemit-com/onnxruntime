@@ -34,7 +34,8 @@ using PThreadPool = OrtThreadPool*;
 class TestEnv {
  public:
   TestEnv(Ort::Env& env, Ort::SessionOptions& sf1, PThreadPool tp,
-          std::vector<ITestCase*>&& tests, TestResultStat& stat1, bool inference_mode = false);
+          std::vector<ITestCase*>&& tests, TestResultStat& stat1, bool inference_mode = false,
+          bool override_output_ref = false);
 
   ~TestEnv();
 
@@ -67,6 +68,8 @@ class TestEnv {
 
   ORT_DISALLOW_COPY_ASSIGNMENT_AND_MOVE(TestEnv);
 
+  bool OverrideOutputRef() const { return override_output_ref_; }
+
  private:
   void CalculateStats(const std::vector<std::shared_ptr<TestCaseResult>>&);
 
@@ -76,4 +79,5 @@ class TestEnv {
   PThreadPool tp_;
   std::vector<ITestCase*> tests_;
   TestResultStat& stat_;
+  bool override_output_ref_{false};
 };

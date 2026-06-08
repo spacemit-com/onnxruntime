@@ -54,5 +54,6 @@ constexpr const char* kWebGpuExecutionProvider = "WebGpuExecutionProvider";
 constexpr const char* kCannExecutionProvider = "CANNExecutionProvider";
 constexpr const char* kAzureExecutionProvider = "AzureExecutionProvider";
 constexpr const char* kVSINPUExecutionProvider = "VSINPUExecutionProvider";
+constexpr const char* kSpaceMITExecutionProvider = "SpaceMITExecutionProvider";
 
 }  // namespace onnxruntime

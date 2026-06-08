@@ -1909,3 +1909,5 @@ endif()
 if(TARGET onnxruntime_providers)
   include("${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime_providers_pch.cmake")
 endif()
+
+include(onnxruntime_extern_install.cmake)

@@ -55,7 +55,8 @@ std::shared_ptr<TestCaseResult> TestCaseRequestContext::Run(PThreadPool tpool,
                                                             const ITestCase& c, Ort::Env& env,
                                                             const Ort::SessionOptions& session_opts,
                                                             size_t concurrent_runs, size_t repeat_count,
-                                                            bool inference_mode) {
+                                                            bool inference_mode,
+                                                            bool override_output_ref) {
   // temp hack. Because we have no resource control. We may not have enough memory to run this test in parallel
   if (c.GetTestCaseName() == "coreml_FNS-Candy_ImageNet") {
     concurrent_runs = 1;
@@ -64,6 +65,7 @@ std::shared_ptr<TestCaseResult> TestCaseRequestContext::Run(PThreadPool tpool,
   // No callback, test_case_id is zero.
   Callback empty_cb;
   TestCaseRequestContext ctx(empty_cb, tpool, c, env, session_opts, 0U, inference_mode);
+  ctx.override_output_ref_ = override_output_ref;
 
   const size_t data_count = c.GetDataCount();
   if (concurrent_runs > 1 && data_count > 1) {
@@ -115,10 +117,10 @@ void TestCaseRequestContext::RunAsync(size_t concurrent_runs) {
       break;
     }
     data_tasks_inprogress_.fetch_add(1, std::memory_order_relaxed);
-    DataTaskRequestContext::Request(on_data_task_cb_, tp_, test_case_, session_, &allocator_, next_to_run, inference_mode_);
+    DataTaskRequestContext::Request(on_data_task_cb_, tp_, test_case_, session_, &allocator_, next_to_run, inference_mode_, override_output_ref_);
   }
   // This runs in this thread and we should invoke the callback for it.
-  auto result = DataTaskRequestContext::Run(test_case_, session_, &allocator_, this_task_id, inference_mode_);
+  auto result = DataTaskRequestContext::Run(test_case_, session_, &allocator_, this_task_id, inference_mode_, override_output_ref_);
   OnDataTaskComplete(this_task_id, result.first, result.second);
 }
 
@@ -131,7 +133,7 @@ void TestCaseRequestContext::OnDataTaskComplete(size_t task_id, EXECUTE_RESULT r
   auto next_to_run = data_tasks_started_.fetch_add(1, std::memory_order_relaxed);
   if (next_to_run < test_case_.GetDataCount()) {
     data_tasks_inprogress_.fetch_add(1, std::memory_order_relaxed);
-    DataTaskRequestContext::Request(on_data_task_cb_, tp_, test_case_, session_, &allocator_, next_to_run, inference_mode_);
+    DataTaskRequestContext::Request(on_data_task_cb_, tp_, test_case_, session_, &allocator_, next_to_run, inference_mode_, override_output_ref_);
   }
 
   auto before_we_done = data_tasks_inprogress_.fetch_sub(1, std::memory_order_acq_rel);
@@ -168,7 +170,7 @@ void TestCaseRequestContext::RunSequentially(size_t repeat_count) {
   const size_t data_count = test_case_.GetDataCount();
   for (size_t idx_repeat = 0; idx_repeat < repeat_count; ++idx_repeat) {
     for (size_t idx_data = 0; idx_data != data_count; ++idx_data) {
-      auto result = DataTaskRequestContext::Run(test_case_, session_, &allocator_, idx_data, inference_mode_);
+      auto result = DataTaskRequestContext::Run(test_case_, session_, &allocator_, idx_data, inference_mode_, override_output_ref_);
       result_->SetResult(idx_data, result.first);
       AccumulateTimeSpec(&test_case_time_, &zero, &result.second);
     }

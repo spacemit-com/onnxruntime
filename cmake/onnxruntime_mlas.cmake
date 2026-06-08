@@ -441,6 +441,8 @@ else()
           set(LOONGARCH64 TRUE)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^s390x$")
           set(S390X TRUE)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^riscv64.*")
+          set(RISCV64 TRUE)
         endif()
     endif()
 
@@ -906,46 +908,98 @@ endif()
         endif()
     endif()
     if(RISCV64 AND MLAS_SOURCE_IS_NOT_SET)
-        file(GLOB_RECURSE mlas_platform_srcs CONFIGURE_DEPENDS
-          "${MLAS_SRC_DIR}/scalar/*.cpp")
+      # spacemit
+      enable_language(ASM)
+      if (NOT RISCV_MARCH_FLAGS)
+        message(FATAL_ERROR "RISCV_MARCH_FLAGS is not set. Please set it to the appropriate value based on your target RISC-V CPU.")
+      else()
+        message(STATUS "Using RISCV_MARCH_FLAGS: ${RISCV_MARCH_FLAGS}")
+      endif()
+      set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} ${RISCV_MARCH_FLAGS}")
+      set(CMAKE_REQUIRED_FLAGS "${RISCV_MARCH_FLAGS}")
+      check_c_source_compiles("int main() {_Float16 f = 1.0; return 0;}" SPINE_COMPILER_SUPPORT_RISCV_DEFINE_FLOAT16)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vsetvli t0, zero, e8, m1,tu,mu\");}" SPINE_COMPILER_SUPPORT_RISCV_DEFINE_RVV)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_IME1)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1, i4\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S4)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot v2, v0, v1, i8\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S8)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vfwmadot v2, v0, v1, fp16\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFWMADOT_FP16)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vfmadot v2, v0, v1, fp32\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_FP32)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot.hp v2, v0, v1, v0, 0, i4\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_S4)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot.hp v2, v0, v1, v0, 0, i8\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VFMADOT_S8)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vmadot1 v2, v0, v1\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOTN)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vpack.vv v2, v0, v1, 2\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VPACK)
+      check_c_source_compiles("int main() {__asm__ volatile(\"vnspack.vv v2, v0, v1, 2\");}" SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VNPACK)
+      unset(CMAKE_REQUIRED_FLAGS)
 
-        if(onnxruntime_USE_RVV)
-          set(OLD_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
-          set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS} -march=rv64gcv -mabi=lp64d")
-          check_cxx_source_compiles("
-            #include <stddef.h>
-            #include <riscv_vector.h>
-            int main() {
-              size_t vl = __riscv_vsetvl_e32m1(4);
-              return static_cast<int>(vl == 0);
-            }"
-            HAS_RISCV64_RVV
+      set(mlas_platform_srcs
+          ${mlas_platform_srcs}
+          ${MLAS_SRC_DIR}/riscv64/ErfKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/ExpKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/SoftmaxKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/TanhKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/CastF16F32RVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/LogisticKernelRVV.cpp
+          ${MLAS_SRC_DIR}/riscv64/MinMaxElementsRVV.cpp
           )
-          set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS}")
-          unset(OLD_CMAKE_REQUIRED_FLAGS)
+      file(GLOB_RECURSE mlas_platform_srcs_generic CONFIGURE_DEPENDS
+          "${MLAS_SRC_DIR}/scalar/*.cpp")
+      set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${mlas_platform_srcs_generic}
+          )
+      if(SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_IME1)
+        set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/qgemm_kernel_spacemit_ime1.cpp
+        )
+        add_compile_definitions(onnxruntime_mlas PRIVATE RISCV_SPACEMIT_IME1=1)
+      endif()
 
-          if(HAS_RISCV64_RVV)
-            list(APPEND mlas_platform_srcs
-              ${MLAS_SRC_DIR}/riscv64/sgemm_pack_b_rvv.cpp
-              ${MLAS_SRC_DIR}/riscv64/sgemm_kernel_rvv.cpp
-              ${MLAS_SRC_DIR}/riscv64/softmax_kernel_rvv.cpp
-            )
-            set_source_files_properties(
-              ${MLAS_SRC_DIR}/riscv64/sgemm_pack_b_rvv.cpp
-              ${MLAS_SRC_DIR}/riscv64/sgemm_kernel_rvv.cpp
-              ${MLAS_SRC_DIR}/riscv64/softmax_kernel_rvv.cpp
-              PROPERTIES COMPILE_FLAGS "-march=rv64gcv -mabi=lp64d")
-            list(APPEND mlas_private_compile_definitions MLAS_USE_RVV=1)
-          else()
-            message(
-              WARNING
-              "onnxruntime_USE_RVV was requested, but the compiler does not support rv64gcv RVV intrinsics. Falling back to scalar MLAS kernels.")
-          endif()
-        endif()
+      if(SPINE_COMPILER_SUPPORT_RISCV_SPACEMIT_VMADOT_S4)
+        set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/qgemm_kernel_spacemit_ime2.cpp
+        )
+        add_compile_definitions(onnxruntime_mlas PRIVATE RISCV_SPACEMIT_IME2=1)
+      endif()
 
-        if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
-          set(MLAS_SOURCE_IS_NOT_SET 0)
+      if(onnxruntime_USE_RVV)
+        set(OLD_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
+        set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS} -march=rv64gcv -mabi=lp64d")
+        check_cxx_source_compiles("
+          #include <stddef.h>
+          #include <riscv_vector.h>
+          int main() {
+            size_t vl = __riscv_vsetvl_e32m1(4);
+            return static_cast<int>(vl == 0);
+          }"
+          HAS_RISCV64_RVV
+        )
+        set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS}")
+        unset(OLD_CMAKE_REQUIRED_FLAGS)
+
+        if(HAS_RISCV64_RVV)
+          list(APPEND mlas_platform_srcs
+            ${MLAS_SRC_DIR}/riscv64/sgemm_pack_b_rvv.cpp
+            ${MLAS_SRC_DIR}/riscv64/sgemm_kernel_rvv.cpp
+            ${MLAS_SRC_DIR}/riscv64/softmax_kernel_rvv.cpp
+          )
+          set_source_files_properties(
+            ${MLAS_SRC_DIR}/riscv64/sgemm_pack_b_rvv.cpp
+            ${MLAS_SRC_DIR}/riscv64/sgemm_kernel_rvv.cpp
+            ${MLAS_SRC_DIR}/riscv64/softmax_kernel_rvv.cpp
+            PROPERTIES COMPILE_FLAGS "-march=rv64gcv -mabi=lp64d")
+          list(APPEND mlas_private_compile_definitions MLAS_USE_RVV=1)
+        else()
+          message(
+            WARNING
+            "onnxruntime_USE_RVV was requested, but the compiler does not support rv64gcv RVV intrinsics. Falling back to scalar MLAS kernels.")
         endif()
+      endif()
+
+      if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
+        set(MLAS_SOURCE_IS_NOT_SET 0)
+      endif()
     endif()
     if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH AND MLAS_SOURCE_IS_NOT_SET)
         file(GLOB_RECURSE mlas_platform_srcs

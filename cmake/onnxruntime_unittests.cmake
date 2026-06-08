@@ -724,6 +724,13 @@ set(ONNXRUNTIME_TEST_LIBS
     onnxruntime_flatbuffers
 )
 
+if (onnxruntime_BUILD_SHARED_LIB)
+  set(ONNXRUNTIME_TEST_LIBS
+    onnxruntime
+    ${ONNXRUNTIME_TEST_LIBS}
+  )
+endif()
+
 if (onnxruntime_ENABLE_TRAINING)
   set(ONNXRUNTIME_TEST_LIBS onnxruntime_training_runner onnxruntime_training ${ONNXRUNTIME_TEST_LIBS})
 endif()
@@ -1328,6 +1335,11 @@ set(onnx_test_libs
   onnx_test_data_proto
   ${onnxruntime_EXTERNAL_LIBRARIES})
 
+set(onnx_benchmark_libs
+  ${ONNXRUNTIME_TEST_LIBS}
+  onnx_test_data_proto
+  ${onnxruntime_EXTERNAL_LIBRARIES})
+
 if (NOT IOS)
     onnxruntime_add_executable(onnx_test_runner ${onnx_test_runner_src_dir}/main.cc)
     if(MSVC)
@@ -1375,7 +1387,8 @@ if (NOT onnxruntime_ENABLE_TRAINING_TORCH_INTEROP)
       ${BENCHMARK_DIR}/quantize.cc
       ${BENCHMARK_DIR}/reduceminmax.cc
       ${BENCHMARK_DIR}/layer_normalization.cc)
-    target_include_directories(onnxruntime_benchmark PRIVATE ${ONNXRUNTIME_ROOT} ${onnxruntime_graph_header} ${ONNXRUNTIME_ROOT}/core/mlas/inc)
+    target_include_directories(onnxruntime_benchmark PRIVATE ${ONNXRUNTIME_ROOT} ${onnxruntime_graph_header}
+      ${ONNXRUNTIME_ROOT}/core/mlas/inc ${TEST_SRC_DIR}/util/include)
     target_compile_definitions(onnxruntime_benchmark PRIVATE BENCHMARK_STATIC_DEFINE)
     target_compile_definitions(onnxruntime_benchmark PRIVATE ${mlas_private_compile_definitions})
     if(WIN32)
@@ -1395,7 +1408,7 @@ if (NOT onnxruntime_ENABLE_TRAINING_TORCH_INTEROP)
       target_compile_options(onnxruntime_benchmark PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /utf-8>"
               "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/utf-8>")
     endif()
-    target_link_libraries(onnxruntime_benchmark PRIVATE onnx_test_runner_common benchmark::benchmark ${onnx_test_libs})
+    target_link_libraries(onnxruntime_benchmark PRIVATE onnx_test_runner_common GTest::gtest GTest::gmock benchmark::benchmark ${onnx_benchmark_libs})
     add_dependencies(onnxruntime_benchmark ${onnxruntime_EXTERNAL_DEPENDENCIES})
     set_target_properties(onnxruntime_benchmark PROPERTIES FOLDER "ONNXRuntimeTest")
 

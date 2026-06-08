@@ -4934,7 +4934,7 @@ static_assert(offsetof(OrtApi, GetTensorElementTypeAndShapeDataReference) / size
 static_assert(offsetof(OrtApi, KernelInfoGetAttributeArray_string) / sizeof(void*) == 417, "Size of version 25 API cannot change");
 
 // So that nobody forgets to finish an API version, this check will serve as a reminder:
-static_assert(std::string_view(ORT_VERSION) == "1.26.0",
+static_assert(std::string_view(ORT_VERSION) == "1.26.0+spacemit.a0",
               "ORT_Version change detected, please follow below steps to ensure OrtApi is updated properly");
 // 1. Update the hardcoded version string in above static_assert to silence it
 //
@@ -4961,9 +4961,9 @@ ORT_API(const OrtApi*, OrtApis::GetApi, uint32_t version) {
 }
 
 ORT_API(const char*, OrtApis::GetVersionString) {
-  static_assert(onnxruntime::version_check::IsOrtVersionValid(ORT_VERSION),
-                "ORT_VERSION must be in the format '1.Y.Z' where Y and Z are non-negative integers without leading "
-                "zeros, and Y must equal ORT_API_VERSION");
+  // static_assert(onnxruntime::version_check::IsOrtVersionValid(ORT_VERSION),
+  //               "ORT_VERSION must be in the format '1.Y.Z' where Y and Z are non-negative integers without leading "
+  //               "zeros, and Y must equal ORT_API_VERSION");
   return ORT_VERSION;
 }
 

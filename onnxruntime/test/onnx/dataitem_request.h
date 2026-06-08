@@ -39,7 +39,8 @@ class DataTaskRequestContext {
   /// <param name="task_id">this task id</param>
   /// <returns>execution result and elapsed time</returns>
   static std::pair<EXECUTE_RESULT, TIME_SPEC> Run(const ITestCase& c, ::Ort::Session& session,
-                                                  OrtAllocator* allocator, size_t task_id, bool inference_mode = false);
+                                                  OrtAllocator* allocator, size_t task_id, bool inference_mode = false,
+                                                  bool override = false);
 
   /// <summary>
   /// Schedules a data task to run on a threadpool. The function
@@ -53,7 +54,8 @@ class DataTaskRequestContext {
   /// <param name="task_id">this taks id</param>
   static void Request(const Callback& cb, concurrency::ThreadPool* tp,
                       const ITestCase& c, ::Ort::Session& session,
-                      OrtAllocator* allocator, size_t task_id, bool inference_mode = false);
+                      OrtAllocator* allocator, size_t task_id, bool inference_mode = false,
+                      bool override = false);
 
   ORT_DISALLOW_COPY_AND_ASSIGNMENT(DataTaskRequestContext);
 
@@ -79,6 +81,10 @@ class DataTaskRequestContext {
     SetTimeSpecToZero(&spent_time_);
   }
 
+  void SetOverrideOutputRef(bool override) {
+    override_output_ref_ = override;
+  }
+
  private:
   void RunAsync();
   std::pair<EXECUTE_RESULT, TIME_SPEC> RunImpl();
@@ -90,6 +96,7 @@ class DataTaskRequestContext {
   size_t task_id_;
   TIME_SPEC spent_time_;
   bool inference_mode_;
+  bool override_output_ref_{false};
 };
 
 }  // namespace test

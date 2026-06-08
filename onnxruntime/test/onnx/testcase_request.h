@@ -51,7 +51,8 @@ class TestCaseRequestContext {
                                              const ITestCase& c, Ort::Env& env,
                                              const Ort::SessionOptions& sf,
                                              size_t concurrent_runs, size_t repeat_count,
-                                             bool inference_mode = false);
+                                             bool inference_mode = false,
+                                             bool override_output_ref = false);
 
   /// <summary>
   /// Schedules a TestCase to asynchronously on a TP. The function returns immediately.
@@ -118,6 +119,7 @@ class TestCaseRequestContext {
   mutable std::mutex mut_;
   mutable std::condition_variable cond_;
   mutable bool finished_ = false;
+  mutable bool override_output_ref_ = false;
 };
 
 }  // namespace test
