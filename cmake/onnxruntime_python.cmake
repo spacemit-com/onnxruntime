@@ -220,7 +220,17 @@ if(WIN32)
   # onnxruntime_pybind11_state is a DLL
   target_sources(onnxruntime_pybind11_state PRIVATE "${ONNXRUNTIME_ROOT}/core/dll/dllmain.cc")
 endif()
-target_link_libraries(onnxruntime_pybind11_state PRIVATE
+if (onnxruntime_BUILD_SHARED_LIB)
+  if (onnxruntime_ENABLE_DLPACK)
+    target_sources(onnxruntime_pybind11_state PRIVATE "${ONNXRUNTIME_ROOT}/core/dlpack/dlpack_converter.cc")
+  endif()
+  target_link_libraries(onnxruntime_pybind11_state PRIVATE
+    ${onnxruntime_libs}
+    ${pybind11_lib}
+    Python::NumPy
+  )
+else()
+  target_link_libraries(onnxruntime_pybind11_state PRIVATE
     onnxruntime_session
     ${onnxruntime_libs}
     ${onnxruntime_pybind11_state_static_providers}
@@ -236,7 +246,8 @@ target_link_libraries(onnxruntime_pybind11_state PRIVATE
     onnxruntime_flatbuffers
     ${pybind11_lib}
     Python::NumPy
-)
+  )
+endif()
 
 # The CUDA quantization helpers (pack_weights_for_cuda_mixed_gemm) are built into a
 # separate extension module (onnxruntime_cuda_quant_preprocess) that is imported on

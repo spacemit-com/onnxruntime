@@ -85,6 +85,7 @@ if(onnxruntime_BUILD_SHARED_LIB)
       --config ${ONNXRUNTIME_PROVIDER_NAMES} ${ANDROID_TELEMETRY_SYMBOL_ARGS}
       --style=${OUTPUT_STYLE} --output ${SYMBOL_FILE}
       --output_source ${CMAKE_CURRENT_BINARY_DIR}/generated_source.c
+      --extra_symbol_file "${ONNXRUNTIME_ROOT}/../cmake/onnxruntime_extern_symbols.txt"
     DEPENDS ${SYMBOL_FILES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 

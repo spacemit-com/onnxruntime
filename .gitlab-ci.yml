@@ -1,0 +1,92 @@
+# onnxruntime CI — riscv64 编译，产物 ort-installed/ 供下游 spacemit-ep 多级流水线消费
+#
+# 网页触发并传入 BUILD_COMMIT 时，构建指定提交的 Python 3.12/3.13/3.14 wheel。
+# 同时传入 GITLAB_PYPI_TOKEN 和 GITLAB_PYPI_USERNAME 时上传 wheel；其他触发方式保留原有构建流程。
+
+include:
+  - project: 'ai/gitlab-ci-templates'
+    file:
+      - 'x86-host-env.yml'
+
+stages:
+  - build
+
+build-rv64:
+  extends: .x86-host-ci-env
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  - if: '$CI_PIPELINE_SOURCE == "web"'
+  - if: '$CI_PIPELINE_SOURCE == "trigger"'
+  - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+  stage: build
+  tags:
+    - 92_13_host
+  variables:
+    RISCV_ROOT_PATH: $DEFAULT_RISCV_ROOT_PATH
+    CMAKE_TLS_VERIFY: 0
+    GIT_DEPTH: "0"
+  script:
+    - set -eo pipefail
+    - BUILD_LOG="$CI_PROJECT_DIR/build-rv64.log"
+    - ': > "$BUILD_LOG"'
+    - ORI_INSTALL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/installed"
+    - INSTALL_DIR="${SHARE_INSTALL_DIR}/build-rv64/installed"
+    - WHEEL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/dist"
+    - |
+      # 完整构建输出只写文件，失败时显示有限的末尾内容，避免 CI 页面达到日志上限。
+      run_build() {
+        local build_status
+        echo "Build started; full log: $BUILD_LOG"
+        if "$@" >> "$BUILD_LOG" 2>&1; then
+          echo "Build completed."
+        else
+          build_status=$?
+          echo "Build failed (exit code $build_status). Last 200 lines (up to 64 KiB):"
+          tail -n 200 "$BUILD_LOG" | tail -c 65536
+          exit "$build_status"
+        fi
+      }
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ]; then
+        git fetch --no-tags origin
+        TARGET_COMMIT=$(git rev-parse --verify --end-of-options "${BUILD_COMMIT}^{commit}")
+        git checkout --detach "$TARGET_COMMIT"
+        echo "Building commit $TARGET_COMMIT" | tee -a "$BUILD_LOG"
+
+        PYTHON_ENV_DIR=$(dirname "$DEFAULT_RISCV_ROOT_PATH")
+        for PYTHON_VERSION in 312 313 314; do
+          test -d "$PYTHON_ENV_DIR/py-riscv64-$PYTHON_VERSION"
+        done
+        python3 -m pip install --break-system-packages setuptools wheel packaging
+
+        # 清除其他提交的旧动态库和 wheel；三个 Python 版本复用同一构建目录。
+        rm -rf "$CI_PROJECT_DIR/build/Linux/rv64"
+        for PYTHON_VERSION in 312 313 314; do
+          echo "Building Python $PYTHON_VERSION" | tee -a "$BUILD_LOG"
+          run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh \
+            "$CI_PROJECT_DIR" rv64 Release Linux gcc \
+            "$PYTHON_ENV_DIR/py-riscv64-$PYTHON_VERSION"
+          WHEELS=("$WHEEL_DIR"/onnxruntime-*-cp"$PYTHON_VERSION"-cp"$PYTHON_VERSION"-linux_riscv64.whl)
+          test "${#WHEELS[@]}" -eq 1
+          test -f "${WHEELS[0]}"
+        done
+      else
+        run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh "$CI_PROJECT_DIR" rv64 Release
+      fi
+    - test -d "$ORI_INSTALL_DIR"
+    - mkdir -p "$INSTALL_DIR"
+    - cp -a "$ORI_INSTALL_DIR"/. "$INSTALL_DIR"/
+    - |
+      set +x
+      if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ] && [ -n "${GITLAB_PYPI_TOKEN:-}" ] && [ -n "${GITLAB_PYPI_USERNAME:-}" ]; then
+        python3 -m pip install --break-system-packages twine
+        TWINE_USERNAME="$GITLAB_PYPI_USERNAME" TWINE_PASSWORD="$GITLAB_PYPI_TOKEN" \
+          python3 -m twine upload --non-interactive \
+          --repository-url https://git.spacemit.com/api/v4/projects/33/packages/pypi \
+          "$WHEEL_DIR"/*.whl
+      fi
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - build-rv64.log

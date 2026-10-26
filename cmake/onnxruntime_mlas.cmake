@@ -1135,6 +1135,14 @@ else()
         endif()
     endif()
     if(RISCV64 AND MLAS_SOURCE_IS_NOT_SET)
+        # SpacemiT: allow the target ISA to be configured from the toolchain file.
+        # Defaults to plain rv64gcv when the caller does not provide RISCV_MARCH_FLAGS.
+        if(NOT RISCV_MARCH_FLAGS)
+          set(RISCV_MARCH_FLAGS "-march=rv64gcv -mabi=lp64d")
+        endif()
+        message(STATUS "MLA RISCV_MARCH_FLAGS: ${RISCV_MARCH_FLAGS}")
+        enable_language(ASM)
+
         file(GLOB_RECURSE mlas_platform_srcs CONFIGURE_DEPENDS
           "${MLAS_SRC_DIR}/scalar/*.cpp")
         # Remove scalar depthwise kernel; replaced by the vectorized version
@@ -1145,7 +1153,7 @@ else()
 
         if(onnxruntime_USE_RVV)
           set(OLD_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
-          set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS} -march=rv64gcv -mabi=lp64d")
+          set(CMAKE_REQUIRED_FLAGS "${OLD_CMAKE_REQUIRED_FLAGS} ${RISCV_MARCH_FLAGS}")
           check_cxx_source_compiles("
             #include <stddef.h>
             #include <riscv_vector.h>
@@ -1188,7 +1196,7 @@ else()
               ${MLAS_SRC_DIR}/riscv64/conv_activation_kernel_rvv.cpp
               ${MLAS_SRC_DIR}/riscv64/qnbitgemm_kernel_rvv.cpp
               ${MLAS_SRC_DIR}/riscv64/linear_attention_kernel_rvv.cpp
-              PROPERTIES COMPILE_FLAGS "-march=rv64gcv -mabi=lp64d")
+              PROPERTIES COMPILE_FLAGS "${RISCV_MARCH_FLAGS}")
             list(APPEND mlas_private_compile_definitions MLAS_USE_RVV=1)
 
             if(onnxruntime_USE_RVV_ZVFH)
@@ -1201,7 +1209,7 @@ else()
                 ${MLAS_SRC_DIR}/riscv64/halfgemm_kernel_rvv.cpp
                 ${MLAS_SRC_DIR}/riscv64/cast_kernel_rvv.cpp
                 ${MLAS_SRC_DIR}/riscv64/hqnbitgemm_kernel_rvv.cpp
-                PROPERTIES COMPILE_FLAGS "-march=rv64gcv_zvfh -mabi=lp64d")
+                PROPERTIES COMPILE_FLAGS "${RISCV_MARCH_FLAGS}")
               list(APPEND mlas_private_compile_definitions MLAS_USE_RVV_ZVFH=1)
             endif()
           else()

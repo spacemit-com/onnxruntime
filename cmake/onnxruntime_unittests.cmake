@@ -764,6 +764,16 @@ set(ONNXRUNTIME_TEST_LIBS
     onnxruntime_flatbuffers
 )
 
+# When onnxruntime is built as a shared library, the test binaries must link against
+# it instead of the individual static targets, otherwise symbols such as `ort_env`
+# that live in the shared lib are not resolved.
+if (onnxruntime_BUILD_SHARED_LIB)
+  set(ONNXRUNTIME_TEST_LIBS
+    onnxruntime
+    ${ONNXRUNTIME_TEST_LIBS}
+  )
+endif()
+
 if (onnxruntime_ENABLE_TRAINING)
   set(ONNXRUNTIME_TEST_LIBS onnxruntime_training_runner onnxruntime_training ${ONNXRUNTIME_TEST_LIBS})
 endif()
@@ -1744,6 +1754,13 @@ set(onnx_test_libs
   ${ONNXRUNTIME_TEST_LIBS}
   onnx_test_data_proto
   ${onnxruntime_EXTERNAL_LIBRARIES})
+
+# onnxruntime_test_utils references symbols (ort_env, gtest internals) that only exist in
+# the shared library when onnxruntime is built with BUILD_SHARED_LIB. Without this the
+# benchmark / test binaries that link onnx_test_libs fail with undefined references.
+if (onnxruntime_BUILD_SHARED_LIB)
+  list(APPEND onnx_test_libs onnxruntime)
+endif()
 
 if (NOT IOS)
     onnxruntime_add_executable(onnx_test_runner ${onnx_test_runner_src_dir}/main.cc)
