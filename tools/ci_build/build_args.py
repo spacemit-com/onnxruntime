@@ -285,6 +285,11 @@ def add_cross_compile_args(parser: argparse.ArgumentParser) -> None:
         help="[cross-compiling] Target RISC-V 64-bit.",
     )
     parser.add_argument(
+        "--riscv_use_clang",
+        action="store_true",
+        help="Use RISC-V clang. e.g. --riscv_use_clang",
+    )
+    parser.add_argument(
         "--riscv_toolchain_root",
         type=str,
         default="",
@@ -886,6 +891,7 @@ def add_other_feature_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Build ORT shared lib with compatible bridge for primary EPs (TRT, OV, QNN, VitisAI), excludes tests.",
     )
+    parser.add_argument("--build_ohos", action="store_true", help="Build With OHOS.")
     # Telemetry arguments (cross-platform)
     telemetry_group = parser.add_mutually_exclusive_group()
     telemetry_group.add_argument(
