@@ -60,6 +60,12 @@
 #ifndef RISCV_HWPROBE_IMA_V
 #define RISCV_HWPROBE_IMA_V (1 << 2)
 #endif
+// Older kernel headers (notably musl sysroots) ship asm/hwprobe.h without the
+// syscall number. It is allocated right after riscv_flush_icache in the
+// arch-specific syscall range; see the kernel's asm/unistd.h.
+#ifndef __NR_riscv_hwprobe
+#define __NR_riscv_hwprobe (__NR_arch_specific_syscall + 14)
+#endif
 #endif  // RISCV64
 
 #endif  // Linux
