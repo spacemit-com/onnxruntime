@@ -1,6 +1,7 @@
-# onnxruntime CI — riscv64 编译，产物 ort-installed/ 供下游 spacemit-ep 多级流水线消费
+# onnxruntime CI — riscv64 编译，产物 build-rv64/installed/ 供下游 spacemit-ep 多级流水线消费
 #
 # 网页触发并传入 BUILD_COMMIT 时，构建指定提交的 Python 3.12/3.13/3.14 wheel。
+# WHEEL_PYTHON_VERSIONS 可选择其中的版本；runner 的 PATH 中须有对应版本的宿主 Python。
 # 同时传入 GITLAB_PYPI_TOKEN 和 GITLAB_PYPI_USERNAME 时上传 wheel；其他触发方式保留原有构建流程。
 
 include:
@@ -25,13 +26,14 @@ build-rv64:
     RISCV_ROOT_PATH: $DEFAULT_RISCV_ROOT_PATH
     CMAKE_TLS_VERIFY: 0
     GIT_DEPTH: "0"
+    WHEEL_PYTHON_VERSIONS: "3.12 3.13 3.14"
   script:
-    - set -eo pipefail
+    - set -euo pipefail
     - BUILD_LOG="$CI_PROJECT_DIR/build-rv64.log"
     - ': > "$BUILD_LOG"'
     - ORI_INSTALL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/installed"
     - INSTALL_DIR="${SHARE_INSTALL_DIR}/build-rv64/installed"
-    - WHEEL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/dist"
+    - WHEEL_DIR="$CI_PROJECT_DIR/build/wheels"
     - |
       # 完整构建输出只写文件，失败时显示有限的末尾内容，避免 CI 页面达到日志上限。
       run_build() {
@@ -53,22 +55,41 @@ build-rv64:
         git checkout --detach "$TARGET_COMMIT"
         echo "Building commit $TARGET_COMMIT" | tee -a "$BUILD_LOG"
 
-        PYTHON_ENV_DIR=$(dirname "$DEFAULT_RISCV_ROOT_PATH")
-        for PYTHON_VERSION in 312 313 314; do
-          test -d "$PYTHON_ENV_DIR/py-riscv64-$PYTHON_VERSION"
+        PYTHON_ENV_DIR=${PYTHON_ENV_DIR:-$(dirname "$DEFAULT_RISCV_ROOT_PATH")}
+        read -ra PYTHON_VERSIONS <<< "${WHEEL_PYTHON_VERSIONS:?Select at least one Python version}"
+        test "${#PYTHON_VERSIONS[@]}" -gt 0
+        for PYTHON_VERSION in "${PYTHON_VERSIONS[@]}"; do
+          case "$PYTHON_VERSION" in
+            3.12|3.13|3.14) ;;
+            *) echo "Unsupported Python version: $PYTHON_VERSION" >&2; exit 1 ;;
+          esac
+          test -d "$PYTHON_ENV_DIR/py-riscv64-${PYTHON_VERSION/./}"
+          if ! command -v "python$PYTHON_VERSION" > /dev/null; then
+            echo "Python $PYTHON_VERSION is required on the build host for the matching wheel ABI." >&2
+            exit 1
+          fi
         done
-        python3 -m pip install --break-system-packages setuptools wheel packaging
 
-        # 清除其他提交的旧动态库和 wheel；三个 Python 版本复用同一构建目录。
-        rm -rf "$CI_PROJECT_DIR/build/Linux/rv64"
-        for PYTHON_VERSION in 312 313 314; do
+        mkdir -p "$WHEEL_DIR"
+        rm -f "$WHEEL_DIR"/*.whl
+        for PYTHON_VERSION in "${PYTHON_VERSIONS[@]}"; do
+          PYTHON_TAG="cp${PYTHON_VERSION/./}"
+          HOST_ENV="$CI_PROJECT_DIR/build/venv-$PYTHON_TAG"
+          export PYTHON_EXECUTABLE="$HOST_ENV/bin/python"
+          export ORT_BUILD_ROOT="$CI_PROJECT_DIR/build/Linux/rv64-$PYTHON_TAG"
+          run_build "python$PYTHON_VERSION" -m venv --clear "$HOST_ENV"
+          run_build "$PYTHON_EXECUTABLE" -m pip install setuptools wheel packaging numpy
+          # 每个 ABI 独立构建；清除旧提交的动态库和打包目录。
+          rm -rf "$ORT_BUILD_ROOT"
           echo "Building Python $PYTHON_VERSION" | tee -a "$BUILD_LOG"
           run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh \
             "$CI_PROJECT_DIR" rv64 Release Linux gcc \
-            "$PYTHON_ENV_DIR/py-riscv64-$PYTHON_VERSION"
-          WHEELS=("$WHEEL_DIR"/onnxruntime-*-cp"$PYTHON_VERSION"-cp"$PYTHON_VERSION"-linux_riscv64.whl)
+            "$PYTHON_ENV_DIR/py-riscv64-${PYTHON_VERSION/./}"
+          WHEELS=("$ORT_BUILD_ROOT/Release/dist"/onnxruntime-*-"$PYTHON_TAG"-"$PYTHON_TAG"-linux_riscv64.whl)
           test "${#WHEELS[@]}" -eq 1
           test -f "${WHEELS[0]}"
+          cp "${WHEELS[0]}" "$WHEEL_DIR/"
+          ORI_INSTALL_DIR="$ORT_BUILD_ROOT/Release/installed"
         done
       else
         run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh "$CI_PROJECT_DIR" rv64 Release
@@ -79,9 +100,9 @@ build-rv64:
     - |
       set +x
       if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ] && [ -n "${GITLAB_PYPI_TOKEN:-}" ] && [ -n "${GITLAB_PYPI_USERNAME:-}" ]; then
-        python3 -m pip install --break-system-packages twine
+        run_build "$PYTHON_EXECUTABLE" -m pip install twine
         TWINE_USERNAME="$GITLAB_PYPI_USERNAME" TWINE_PASSWORD="$GITLAB_PYPI_TOKEN" \
-          python3 -m twine upload --non-interactive \
+          "$PYTHON_EXECUTABLE" -m twine upload --non-interactive \
           --repository-url https://git.spacemit.com/api/v4/projects/33/packages/pypi \
           "$WHEEL_DIR"/*.whl
       fi
@@ -90,3 +111,4 @@ build-rv64:
     expire_in: 1 week
     paths:
       - build-rv64.log
+      - build/wheels/*.whl

@@ -591,6 +591,8 @@ endif()
 
 
 file (STRINGS "${REPO_ROOT}/VERSION_NUMBER" ORT_VERSION)
+# PEP 440 local labels identify Python packages, not the native API or library ABI.
+string(REGEX REPLACE "\\+.*$" "" ORT_VERSION "${ORT_VERSION}")
 
 find_package(Threads)
 # On Windows we directly use Windows APIs to do the job

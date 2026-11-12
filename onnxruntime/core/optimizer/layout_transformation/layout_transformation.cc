@@ -158,8 +158,9 @@ Status TransformLayoutForEP(Graph& graph, bool& modified, const IExecutionProvid
           auto constant = api_graph->GetConstant(node->Inputs()[i]);
           if (constant != nullptr && constant->Data().size() > 0) {
             // Starting from opset version 18, the 'scales' and 'sizes' can be any length up to the input rank.
-            // However, our current implementation only supports the transposition of 4D tensors.
-            if (constant->NumElements() == 4) {
+            // Permute them whenever their length matches the data rank so the channels-first -> channels-last
+            // perm applies cleanly (covers the 4D case as before, plus rank-3 1D Resize).
+            if (constant->NumElements() == rank) {
               input_perms.push_back(&input_perm);
             }
           } else {

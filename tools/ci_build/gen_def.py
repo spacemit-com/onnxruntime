@@ -24,7 +24,8 @@ def parse_arguments():
 args = parse_arguments()
 print(f"Generating symbol file for {args.config!s}")
 with open(args.version_file) as f:
-    VERSION_STRING = f.read().strip()
+    # Keep the native symbol ABI unchanged by PEP 440 local package labels.
+    VERSION_STRING = f.read().strip().split("+", 1)[0]
 
 print(f"VERSION:{VERSION_STRING}")
 
