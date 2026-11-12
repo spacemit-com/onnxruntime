@@ -630,13 +630,11 @@ def generate_build_tree(
         if not args.skip_tests and not args.riscv_qemu_path:
             raise BuildError("The --riscv_qemu_path option is required for testing riscv64.")
 
-        toolchain_file = "riscv64.toolchain.cmake"
+        toolchain_file = "riscv64.spacemit.toolchain.cmake"
         if args.riscv_use_clang:
             toolchain_file = "riscv64.spacemit.clang.toolchain.cmake"
         elif args.build_ohos:
             toolchain_file = "riscv64.oh.spacemit.toolchain.cmake"
-        elif platform.machine() != "riscv64":
-            toolchain_file = "riscv64.spacemit.toolchain.cmake"
 
         cmake_args += [
             "-DRISCV_TOOLCHAIN_ROOT:PATH=" + args.riscv_toolchain_root,
