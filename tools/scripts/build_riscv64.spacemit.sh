@@ -1,9 +1,10 @@
 #!/bin/bash
-# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config> [os] [cc]
+# bash build_riscv64.spacemit.sh <onnxruntime_src_dir> <arch> <config> [os] [cc] [python_dir]
 # arch:   x86 | rv64
 # config: Release | RelWithDebInfo | Debug
 # os:     Linux (default) | OHOS
 # cc:     gcc (default) | clang
+# python_dir: optional target Python prefix for Linux rv64 cross compilation
 # before run this script, please ensure that RISCV_ROOT_PATH is set to the path of riscv toolchain
 # https://archive.spacemit.com/toolchain/spacemit-toolchain-linux-glibc-x86_64-v1.1.2.tar.xz
 
@@ -12,6 +13,7 @@ ARCH_ARG=${2}
 CONFIG=${3}
 OS=${4:-Linux}
 CC=${5:-gcc}
+PYTHON_DIR=${6:-}
 
 if [[ "$OS" != "Linux" && "$OS" != "OHOS" ]]; then
     echo "Error: os must be Linux or OHOS" >&2; exit 1
@@ -35,6 +37,7 @@ fi
 
 BUILD_ARGS="--build_micro_benchmarks"
 EXTERN_ARGS=""
+PYTHON_ARGS=()
 
 # Native build: enable python bindings; Linux+gcc native rv64 skips micro benchmarks
 if [ "$ARCH_ARG" = "$MATCH_ARCH" ]; then
@@ -43,6 +46,13 @@ if [ "$ARCH_ARG" = "$MATCH_ARCH" ]; then
     if [ "$ARCH_ARG" = "rv64" ]; then
         BUILD_ARGS="--skip_onnx_tests"
     fi
+elif [ "$ARCH_ARG" = "rv64" ] && [ -n "$PYTHON_DIR" ]; then
+    if [ "$OS" != "Linux" ]; then
+        echo "Error: Python wheel cross compilation requires Linux" >&2; exit 1
+    fi
+    echo "BUILD ORT With Python (cross compilation)"
+    EXTERN_ARGS="--enable_pybind --build_wheel"
+    PYTHON_ARGS=(--riscv_python_root "$PYTHON_DIR")
 fi
 
 # Toolchain flags: always except Linux+gcc cross-compiling non-rv64
@@ -75,7 +85,7 @@ python3 ${ORT_SRC}/tools/ci_build/build.py --build_dir ${BUILD_DIR} --config ${C
     --skip_submodule_sync \
     --use_mimalloc \
     --skip_tests \
-    ${EXTERN_ARGS}
+    "${PYTHON_ARGS[@]}" ${EXTERN_ARGS}
 
 pushd ${BUILD_DIR}/${CONFIG}
     make install

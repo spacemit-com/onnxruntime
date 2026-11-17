@@ -288,6 +288,10 @@ def add_cross_compile_args(parser: argparse.ArgumentParser) -> None:
         help="Path to RISC-V toolchain root.",
     )
     parser.add_argument(
+        "--riscv_python_root",
+        help="Target CPython 3.12/3.13/3.14 prefix for Linux RISC-V Python cross compilation (use with --build_wheel).",
+    )
+    parser.add_argument(
         "--riscv_qemu_path",
         type=str,
         default="",

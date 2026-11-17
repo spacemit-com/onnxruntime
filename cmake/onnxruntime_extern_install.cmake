@@ -80,11 +80,13 @@ if (onnxruntime_ENABLE_PYTHON)
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/onnxruntime DESTINATION ${CMAKE_INSTALL_PREFIX}/python)
 endif()
 
-install(TARGETS onnxruntime_provider_test
-            ARCHIVE   DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            LIBRARY   DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            RUNTIME   DESTINATION ${CMAKE_INSTALL_BINDIR}
-            FRAMEWORK DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(TARGET onnxruntime_provider_test)
+  install(TARGETS onnxruntime_provider_test
+              ARCHIVE   DESTINATION ${CMAKE_INSTALL_LIBDIR}
+              LIBRARY   DESTINATION ${CMAKE_INSTALL_LIBDIR}
+              RUNTIME   DESTINATION ${CMAKE_INSTALL_BINDIR}
+              FRAMEWORK DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 if (onnxruntime_BUILD_BENCHMARKS)
 install(TARGETS onnxruntime_perf_test
