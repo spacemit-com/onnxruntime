@@ -52,6 +52,14 @@ if parse_arg_remove_boolean(sys.argv, "--nightly_build"):
     nightly_build = True
 
 wheel_name_suffix = parse_arg_remove_string(sys.argv, "--wheel_name_suffix=")
+riscv_python_root = parse_arg_remove_string(sys.argv, "--riscv_python_root=")
+riscv_python = None
+if riscv_python_root:
+    from tools.ci_build.riscv_python import load_target_python
+
+    if platform.system() != "Linux":
+        raise ValueError("RISC-V wheels must be cross-built on Linux")
+    riscv_python = load_target_python(riscv_python_root)
 
 cuda_version = None
 cuda_major_version = None
@@ -120,7 +128,7 @@ manylinux_tags = [
     "manylinux_2_34_x86_64",
     "manylinux_2_34_aarch64",
 ]
-is_manylinux = environ.get("AUDITWHEEL_PLAT", None) in manylinux_tags
+is_manylinux = not riscv_python and environ.get("AUDITWHEEL_PLAT", None) in manylinux_tags
 
 
 class build_ext(_build_ext):  # noqa: N801
@@ -128,6 +136,7 @@ class build_ext(_build_ext):  # noqa: N801
         dest_file = self.get_ext_fullpath(ext.name)
         logger.info("copying %s -> %s", ext.sources[0], dest_file)
         copyfile(ext.sources[0], dest_file)
+
 
 SHAREDLIB_IMPORTS = """
 try:
@@ -145,7 +154,12 @@ try:
     class bdist_wheel(_bdist_wheel):  # noqa: N801
         """Helper functions to create wheel package"""
 
-        if is_openvino and is_manylinux:
+        if riscv_python:
+
+            def get_tag(self):
+                return (riscv_python["python_tag"], riscv_python["abi_tag"], "linux_riscv64")
+
+        elif is_openvino and is_manylinux:
 
             def get_tag(self):
                 _, _, plat = _bdist_wheel.get_tag(self)
@@ -311,7 +325,7 @@ try:
                 self._rewrite_ld_preload_tensorrt(to_preload_tensorrt)
                 self._rewrite_ld_preload_tensorrt(to_preload_nv_tensorrt_rtx)
                 self._rewrite_ld_preload(to_preload_cann)
-            elif platform.machine() == "riscv64":
+            elif riscv_python or platform.machine() == "riscv64":
                 self._rewrite_ld_preload_shared_lib()
             else:
                 pass

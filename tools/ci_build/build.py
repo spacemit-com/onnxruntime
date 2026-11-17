@@ -30,6 +30,7 @@ REPO_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
 sys.path.insert(0, os.path.join(REPO_DIR, "tools", "python"))
 import util.android as android  # noqa: E402
 from build_args import parse_arguments  # noqa: E402
+from riscv_python import load_target_numpy, load_target_python  # noqa: E402
 from util import (  # noqa: E402
     generate_android_triplets,
     generate_linux_triplets,
@@ -517,6 +518,9 @@ def generate_build_tree(
         "-Donnxruntime_DISABLE_OPTIONAL_TYPE=" + ("ON" if disable_optional_type else "OFF"),
         "-Donnxruntime_CUDA_MINIMAL=" + ("ON" if args.enable_cuda_minimal_build else "OFF"),
     ]
+    # Always pass the root, including an empty value, so reconfiguration cannot
+    # accidentally retain a previous target Python installation.
+    cmake_args.append("-Donnxruntime_RISCV_PYTHON_ROOT=" + (args.riscv_python_root or ""))
     if args.minimal_build is not None:
         add_default_definition(cmake_extra_defines, "ONNX_MINIMAL_BUILD", "ON")
     if args.rv64:
@@ -1971,6 +1975,7 @@ def build_python_wheel(
     default_training_package_device=False,
     use_ninja=False,
     enable_training_apis=False,
+    riscv_python_root=None,
 ):
     for config in configs:
         cwd = get_config_build_dir(build_dir, config)
@@ -1978,6 +1983,8 @@ def build_python_wheel(
             cwd = os.path.join(cwd, config)
 
         args = [sys.executable, os.path.join(source_dir, "setup.py"), "bdist_wheel"]
+        if riscv_python_root:
+            args += [f"--riscv_python_root={riscv_python_root}", "--plat-name=linux_riscv64"]
 
         # Any combination of the following arguments can be applied
         if nightly_build:
@@ -2335,6 +2342,24 @@ def main():
     if args.build_wheel or args.gen_doc or args.enable_training:
         args.enable_pybind = True
 
+    if args.riscv_python_root:
+        if not (is_linux() and args.rv64 and platform.machine() != "riscv64" and not args.build_ohos):
+            raise BuildError("--riscv_python_root requires Linux RISC-V cross compilation (--rv64).")
+        if not args.enable_pybind or args.enable_training or args.gen_doc:
+            raise BuildError(
+                "Use --riscv_python_root with --build_wheel or --enable_pybind; training/docs are unsupported."
+            )
+        if not args.skip_tests:
+            raise BuildError("Use --skip_tests for a RISC-V Python cross build; test the wheel on the target.")
+        try:
+            target_python = load_target_python(args.riscv_python_root)
+            load_target_numpy(target_python)
+            args.riscv_python_root = target_python["root"]
+        except (OSError, ValueError, SyntaxError) as exc:
+            raise BuildError(str(exc)) from exc
+    elif args.rv64 and platform.machine() != "riscv64" and args.enable_pybind:
+        raise BuildError("RISC-V Python cross compilation requires --riscv_python_root.")
+
     if (
         args.build_csharp
         or args.build_nuget
@@ -2649,6 +2674,7 @@ def main():
                 default_training_package_device=default_training_package_device,
                 use_ninja=(args.cmake_generator == "Ninja"),
                 enable_training_apis=args.enable_training_apis,
+                riscv_python_root=args.riscv_python_root,
             )
 
         if args.build_nuget:
