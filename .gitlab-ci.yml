@@ -179,4 +179,5 @@ build-rv64-ohos:
   variables:
     SDK_ARCH: rv64
     SDK_OS: OHOS
+    DEFAULT_OHOS_RISCV_ROOT_PATH: "/home/share/nfs_share/ci-node-compiler-env/spacemit-toolchain-linux-musl-x86_64-oh-20260630"
     RISCV_ROOT_PATH: "$DEFAULT_OHOS_RISCV_ROOT_PATH"
