@@ -1,8 +1,9 @@
-# onnxruntime CI — riscv64 编译，产物 build-rv64/installed/ 供下游 spacemit-ep 多级流水线消费
+# onnxruntime CI — 构建 x86_64 Linux、riscv64 Linux 和 riscv64 OHOS SDK。
+# 安装产物写入共享目录；设置 NEXUS_USER（用户名:密码）时上传 SDK 归档和 SHA-256 校验文件。
 #
-# 网页触发并传入 BUILD_COMMIT 时，构建指定提交的 Python 3.12/3.13/3.14 wheel。
+# 网页触发并传入 BUILD_COMMIT 时，构建指定提交；build-rv64 额外构建 Python 3.12/3.13/3.14 wheel。
 # WHEEL_PYTHON_VERSIONS 可选择其中的版本；runner 的 PATH 中须有对应版本的宿主 Python。
-# 同时传入 GITLAB_PYPI_TOKEN 和 GITLAB_PYPI_USERNAME 时上传 wheel；其他触发方式保留原有构建流程。
+# 同时传入 GITLAB_PYPI_TOKEN 和 GITLAB_PYPI_USERNAME 时上传 wheel。
 
 include:
   - project: 'ai/gitlab-ci-templates'
@@ -12,29 +13,38 @@ include:
 stages:
   - build
 
-build-rv64:
+.build-sdk:
   extends: .x86-host-ci-env
   rules:
-  - if: '$CI_PIPELINE_SOURCE == "schedule"'
-  - if: '$CI_PIPELINE_SOURCE == "web"'
-  - if: '$CI_PIPELINE_SOURCE == "trigger"'
-  - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
   stage: build
   tags:
     - 92_13_host
   variables:
-    RISCV_ROOT_PATH: $DEFAULT_RISCV_ROOT_PATH
     CMAKE_TLS_VERIFY: 0
     GIT_DEPTH: "0"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - $CI_JOB_NAME.log
+      - build/packages/$CI_JOB_NAME/*.tar.gz
+      - build/packages/$CI_JOB_NAME/*.tar.gz.sha256
+
+build-rv64:
+  extends: .build-sdk
+  variables:
+    RISCV_ROOT_PATH: "$DEFAULT_RISCV_ROOT_PATH"
     WHEEL_PYTHON_VERSIONS: "3.12 3.13 3.14"
   script:
-    - set -euo pipefail
-    - BUILD_LOG="$CI_PROJECT_DIR/build-rv64.log"
-    - ': > "$BUILD_LOG"'
-    - ORI_INSTALL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/installed"
-    - INSTALL_DIR="${SHARE_INSTALL_DIR}/build-rv64/installed"
-    - WHEEL_DIR="$CI_PROJECT_DIR/build/wheels"
-    - |
+    - &setup_build |
+      set -euo pipefail
+      BUILD_LOG="$CI_PROJECT_DIR/$CI_JOB_NAME.log"
+      : > "$BUILD_LOG"
+
       # 完整构建输出只写文件，失败时显示有限的末尾内容，避免 CI 页面达到日志上限。
       run_build() {
         local build_status
@@ -48,13 +58,17 @@ build-rv64:
           exit "$build_status"
         fi
       }
-    - |
+    - &checkout_build_commit |
       if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ]; then
         git fetch --no-tags origin
         TARGET_COMMIT=$(git rev-parse --verify --end-of-options "${BUILD_COMMIT}^{commit}")
         git checkout --detach "$TARGET_COMMIT"
         echo "Building commit $TARGET_COMMIT" | tee -a "$BUILD_LOG"
-
+      fi
+    - ORI_INSTALL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/installed"
+    - WHEEL_DIR="$CI_PROJECT_DIR/build/wheels"
+    - |
+      if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ]; then
         PYTHON_ENV_DIR=${PYTHON_ENV_DIR:-$(dirname "$DEFAULT_RISCV_ROOT_PATH")}
         read -ra PYTHON_VERSIONS <<< "${WHEEL_PYTHON_VERSIONS:?Select at least one Python version}"
         test "${#PYTHON_VERSIONS[@]}" -gt 0
@@ -94,9 +108,35 @@ build-rv64:
       else
         run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh "$CI_PROJECT_DIR" rv64 Release
       fi
-    - test -d "$ORI_INSTALL_DIR"
-    - mkdir -p "$INSTALL_DIR"
-    - cp -a "$ORI_INSTALL_DIR"/. "$INSTALL_DIR"/
+    - &publish_sdk |
+      INSTALL_DIR="$SHARE_INSTALL_DIR/$CI_JOB_NAME/installed"
+      test -d "$ORI_INSTALL_DIR"
+      mkdir -p "$INSTALL_DIR"
+      cp -a "$ORI_INSTALL_DIR"/. "$INSTALL_DIR"/
+
+      PACKAGE_DIR="$CI_PROJECT_DIR/build/packages/$CI_JOB_NAME"
+      VERSION=$(tr -d '[:space:]' < "$CI_PROJECT_DIR/VERSION_NUMBER")
+      test -n "$VERSION"
+      BUILD_REVISION=$(git rev-parse --short=12 HEAD)
+      ARCHIVE="onnxruntime-${CI_JOB_NAME#build-}-$VERSION-$BUILD_REVISION.tar.gz"
+      mkdir -p "$PACKAGE_DIR"
+      tar -C "$ORI_INSTALL_DIR" -czf "$PACKAGE_DIR/$ARCHIVE" .
+      (cd "$PACKAGE_DIR" && sha256sum "$ARCHIVE" > "$ARCHIVE.sha256")
+
+      set +x
+      if [ -n "${NEXUS_USER:-}" ]; then
+        NEXUS_BASE="https://nexus.bianbu.xyz/repository/ai/onnxruntime"
+        for file in "$ARCHIVE" "$ARCHIVE.sha256"; do
+          echo "Uploading $file to Nexus"
+          http_code=$(curl --silent --show-error --user "$NEXUS_USER" \
+            --upload-file "$PACKAGE_DIR/$file" --output /dev/null \
+            --write-out '%{http_code}' "$NEXUS_BASE/$file")
+          case "$http_code" in
+            2??) ;;
+            *) echo "Nexus upload failed for $file (HTTP $http_code)" >&2; exit 1 ;;
+          esac
+        done
+      fi
     - |
       set +x
       if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ] && [ -n "${GITLAB_PYPI_TOKEN:-}" ] && [ -n "${GITLAB_PYPI_USERNAME:-}" ]; then
@@ -107,8 +147,35 @@ build-rv64:
           "$WHEEL_DIR"/*.whl
       fi
   artifacts:
-    when: always
-    expire_in: 1 week
     paths:
-      - build-rv64.log
+      - $CI_JOB_NAME.log
+      - build/packages/$CI_JOB_NAME/*.tar.gz
+      - build/packages/$CI_JOB_NAME/*.tar.gz.sha256
       - build/wheels/*.whl
+
+.build-sdk-no-python:
+  extends: .build-sdk
+  script:
+    - *setup_build
+    - *checkout_build_commit
+    - |
+      ORT_BUILD_ROOT="$CI_PROJECT_DIR/build/$SDK_OS/$SDK_ARCH"
+      ORI_INSTALL_DIR="$ORT_BUILD_ROOT/Release/installed"
+      # BUILD_COMMIT 可以早于 ORT_SKIP_PYTHON 开关，构建入口取流水线提交的版本。
+      git show "$CI_COMMIT_SHA:tools/scripts/build_riscv64.spacemit.sh" |
+        ORT_BUILD_ROOT="$ORT_BUILD_ROOT" ORT_SKIP_PYTHON=1 \
+        run_build bash -se -- "$CI_PROJECT_DIR" "$SDK_ARCH" Release "$SDK_OS"
+    - *publish_sdk
+
+build-x86_64:
+  extends: .build-sdk-no-python
+  variables:
+    SDK_ARCH: x86
+    SDK_OS: Linux
+
+build-rv64-ohos:
+  extends: .build-sdk-no-python
+  variables:
+    SDK_ARCH: rv64
+    SDK_OS: OHOS
+    RISCV_ROOT_PATH: "$DEFAULT_OHOS_RISCV_ROOT_PATH"

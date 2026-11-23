@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage: build_riscv64.spacemit.sh <src> <x86|rv64> <config> [Linux|OHOS] [gcc|clang] [python_dir]
 # Linux defaults to GCC; OHOS uses its dedicated Clang toolchain.
 # ORT_BUILD_ROOT overrides the configuration parent directory.
+# ORT_SKIP_PYTHON=1 disables Python bindings and wheel generation for SDK-only builds.
 # RISCV_ROOT_PATH selects the target toolchain; PYTHON_EXECUTABLE selects the host Python.
 # CMAKE_BUILD_PARALLEL_LEVEL controls parallelism. python_dir enables a Linux rv64 cross wheel
 # with target Python/NumPy headers matching the host Python version and ABI.
@@ -71,8 +72,8 @@ if [[ "${ARCH_ARG}" == rv64 ]]; then
 elif [[ "${TARGET_CC}" == clang ]]; then
     CMAKE_DEFINES+=(CMAKE_C_COMPILER=clang CMAKE_CXX_COMPILER=clang++)
 fi
-HOST_ARCH=$(uname -m)
-if [[ "${TARGET_OS}" == Linux ]]; then
+if [[ "${TARGET_OS}" == Linux && "${ORT_SKIP_PYTHON:-0}" != 1 ]]; then
+    HOST_ARCH=$(uname -m)
     if [[ ( "${ARCH_ARG}" == x86 && "${HOST_ARCH}" == x86_64 ) ||
           ( "${ARCH_ARG}" == rv64 && "${HOST_ARCH}" == riscv64 ) ]]; then
         BUILD_ARGS+=(--enable_pybind --build_wheel)
