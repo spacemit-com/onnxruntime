@@ -1,9 +1,10 @@
 # onnxruntime CI — 构建 x86_64 Linux、riscv64 Linux 和 riscv64 OHOS SDK。
 # 安装产物写入共享目录；设置 NEXUS_USER（用户名:密码）时上传 SDK 归档和 SHA-256 校验文件。
 #
-# 网页触发并传入 BUILD_COMMIT 时，构建指定提交；build-rv64 额外构建 Python 3.12/3.13/3.14 wheel。
+# 网页触发并传入 BUILD_COMMIT 时，构建指定提交。
+# 同时传入 GITLAB_PYPI_TOKEN 时，build-rv64 额外构建 Python 3.12/3.13/3.14 wheel。
 # WHEEL_PYTHON_VERSIONS 可选择其中的版本；runner 的 PATH 中须有对应版本的宿主 Python。
-# 同时传入 GITLAB_PYPI_TOKEN 和 GITLAB_PYPI_USERNAME 时上传 wheel。
+# 另传入 GITLAB_PYPI_USERNAME 时上传 wheel。
 
 include:
   - project: 'ai/gitlab-ci-templates'
@@ -70,7 +71,9 @@ build-rv64:
     - ORI_INSTALL_DIR="$CI_PROJECT_DIR/build/Linux/rv64/Release/installed"
     - WHEEL_DIR="$CI_PROJECT_DIR/build/wheels"
     - |
-      if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ]; then
+      # 只测试 token 是否非空，避免 CI_DEBUG_TRACE 输出凭据。
+      if [ "$CI_PIPELINE_SOURCE" = "web" ] && [ -n "${BUILD_COMMIT:-}" ] &&
+         [ -n "${GITLAB_PYPI_TOKEN:+set}" ]; then
         PYTHON_ENV_DIR=${PYTHON_ENV_DIR:-$(dirname "$DEFAULT_RISCV_ROOT_PATH")}
         read -ra PYTHON_VERSIONS <<< "${WHEEL_PYTHON_VERSIONS:?Select at least one Python version}"
         test "${#PYTHON_VERSIONS[@]}" -gt 0
@@ -108,7 +111,7 @@ build-rv64:
           ORI_INSTALL_DIR="$ORT_BUILD_ROOT/Release/installed"
         done
       else
-        run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh "$CI_PROJECT_DIR" rv64 Release
+        ORT_SKIP_PYTHON=1 run_build bash -e ./tools/scripts/build_riscv64.spacemit.sh "$CI_PROJECT_DIR" rv64 Release
       fi
     - &publish_sdk |
       INSTALL_DIR="$SHARE_INSTALL_DIR/$CI_JOB_NAME/installed"
