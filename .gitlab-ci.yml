@@ -26,6 +26,8 @@ stages:
   variables:
     CMAKE_TLS_VERIFY: 0
     GIT_DEPTH: "0"
+    # 共享证书包里的 dc.com-CA 也是 Nexus 证书的签发者。
+    NEXUS_CA_BUNDLE: "/home/share/nfs_share/ci-node-compiler-env/gitlab-dc-com-ca.pem"
   artifacts:
     when: always
     expire_in: 1 week
@@ -117,8 +119,7 @@ build-rv64:
       PACKAGE_DIR="$CI_PROJECT_DIR/build/packages/$CI_JOB_NAME"
       VERSION=$(tr -d '[:space:]' < "$CI_PROJECT_DIR/VERSION_NUMBER")
       test -n "$VERSION"
-      BUILD_REVISION=$(git rev-parse --short=12 HEAD)
-      ARCHIVE="onnxruntime-${CI_JOB_NAME#build-}-$VERSION-$BUILD_REVISION.tar.gz"
+      ARCHIVE="onnxruntime-${CI_JOB_NAME#build-}-$VERSION.tar.gz"
       mkdir -p "$PACKAGE_DIR"
       tar -C "$ORI_INSTALL_DIR" -czf "$PACKAGE_DIR/$ARCHIVE" .
       (cd "$PACKAGE_DIR" && sha256sum "$ARCHIVE" > "$ARCHIVE.sha256")
@@ -128,7 +129,7 @@ build-rv64:
         NEXUS_BASE="https://nexus.bianbu.xyz/repository/ai/onnxruntime"
         for file in "$ARCHIVE" "$ARCHIVE.sha256"; do
           echo "Uploading $file to Nexus"
-          http_code=$(curl --silent --show-error --user "$NEXUS_USER" \
+          http_code=$(curl --silent --show-error --cacert "$NEXUS_CA_BUNDLE" --user "$NEXUS_USER" \
             --upload-file "$PACKAGE_DIR/$file" --output /dev/null \
             --write-out '%{http_code}' "$NEXUS_BASE/$file")
           case "$http_code" in
